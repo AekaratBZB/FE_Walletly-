@@ -1,6 +1,6 @@
-# 💰 FE_Walletly - ระบบบริหารการเงินส่วนบุคคลครบวงจร
+# 💰 Walletly (FinSmart Thai) - ระบบบริหารการเงินส่วนบุคคลครบวงจร (React + Vite)
 
-**Walletly** เว็บแอปพลิเคชันจัดการการเงินส่วนบุคคล ออกแบบมาเพื่อคนไทยโดยเฉพาะ ครอบคลุมตั้งแต่การบันทึกรายรับ-รายจ่าย, พยากรณ์กระแสเงินสดล่วงหน้า, ควบคุมฟิกคอสประจำเดือน, จัดสรรงบประมาณตามสูตร 50/30/20, วางแผนเป้าหมายการเงิน, ไปจนถึงการคำนวณภาษีเงินได้บุคคลธรรมดา (ภ.ง.ด. 90/91)
+**Walletly** เว็บแอปพลิเคชันจัดการการเงินส่วนบุคคลยุคใหม่ พัฒนาด้วย **React + Vite** ครอบคลุมตั้งแต่การบันทึกรายรับ-รายจ่าย, พยากรณ์กระแสเงินสดล่วงหน้า, ควบคุมฟิกคอสประจำเดือน, จัดสรรงบประมาณตามสูตร 50/30/20 & 6 Jars, วางแผนเป้าหมายการเงิน, ไปจนถึงการคำนวณภาษีเงินได้บุคคลธรรมดา (ภ.ง.ด. 90/91)
 
 ---
 
@@ -19,10 +19,11 @@
    - ควบคุมภาระค่าใช้จ่ายคงที่ (ค่าผ่อนบ้าน, ค่าผ่อนรถ, ค่าเน็ต, ประกัน, Subscriptions)
    - กำหนดรอบวันที่ต้องจ่าย (Due Date) พร้อมปุ่มติ๊กสถานะ "ชำระแล้ว / รอชำระ"
    - คำนวณ Fixed Cost Burden Ratio (% ภาระต่อรายได้) ป้องกันค่าใช้จ่ายเกินตัว
+   - ปุ่มเริ่มรอบเดือนใหม่ (Reset Monthly Status) ใน 1 คลิก
 
 4. 🔮 **คำนวณการใช้เงินล่วงหน้า & สภาพคล่อง (Cash Flow Forecast & Simulator)**
    - คำนวณงบกินใช้ปลอดภัยต่อวัน (Safe Daily Spend)
-   - ประมาณการเงินคงเหลือสิ้นเดือนและระยะเวลาสภาพคล่อง (Runway Days)
+   - ประมาณการเงินคงเหลือสิ้นเดือนและระยะเวลาสภาพคล่อง (Runway Days/Months)
    - **"Can I Afford It?" Simulator**: เครื่องมือจำลองก่อนตัดสินใจซื้อของชิ้นใหญ่ (จ่ายสด vs ผ่อน 0% X เดือน) เพื่อดูผลกระทบต่อสภาพคล่อง
 
 5. 🥧 **แบ่งสัดส่วน % งบประมาณ (Bucket Budgeting)**
@@ -32,6 +33,7 @@
 
 6. 🎯 **วางแผนการออม & ลงทุน (Savings & Wealth Goals)**
    - ตั้งเป้าหมายทางการเงินและแถบแสดงความคืบหน้า (Progress Bar)
+   - ปุ่ม "+ ฝากเพิ่ม" เข้าเป้าหมาย และบันทึกลงบัญชีออมอัตโนมัติ
    - **Emergency Fund Calculator**: คำนวณเงินสำรองฉุกเฉิน 3, 6, 12 เดือน จากฐานค่าใช้จ่ายจริง พร้อมปุ่มสร้างเป้าหมายใน 1 คลิก
    - **Compound Interest Calculator**: เครื่องมือคำนวณพลังดอกเบี้ยทบต้นและผลตอบแทนในอนาคต
 
@@ -44,45 +46,72 @@
    - สรุปยอดขอคืนภาษี (Tax Refund) หรือ ภาษีที่ต้องชำระเพิ่ม (Tax Due)
 
 8. 📈 **รายงานสถิติ & สำรองข้อมูล (Reports & Backup)**
-   - กราฟแท่งเปรียบเทียบกระแสเงินสด (Chart.js)
-   - กราฟโดนัทจำแนกสัดส่วนค่าใช้จ่ายตามหมวดหมู่
+   - กราฟโดนัทจำแนกสัดส่วนค่าใช้จ่ายตามหมวดหมู่ (Chart.js)
+   - กราฟแท่งเปรียบเทียบกระแสเงินสด
    - กราฟสัดส่วน Fixed vs Variable vs Savings
    - สำรองข้อมูลเป็นไฟล์ JSON (Export/Import Backup) และปุ่มโหลดข้อมูลตัวอย่าง (Demo Data)
 
 ---
 
-## 🛠️ โครงสร้างไฟล์ใน Repository
+## 🛠️ โครงสร้างโปรเจกต์ (React Component Architecture)
 
 ```
-FE_Walletly/
-├── index.html            # หน้าหลัก Single Page Application
-├── css/
-│   ├── main.css          # Design System, Typography, Colors
-│   └── components.css    # UI Components, Modals, Forms, Cards
-├── js/
-│   ├── app.js            # App Controller & Navigation
-│   ├── storage.js        # LocalStorage, State, Export/Import
-│   ├── transactions.js   # โมดูลบันทึกรายรับ-รายจ่าย
-│   ├── fixed-costs.js    # โมดูลฟิกคอสประจำเดือน
-│   ├── projection.js     # โมดูลพยากรณ์กระแสเงินสด & Simulator
-│   ├── allocation.js     # โมดูลจัดสรรสัดส่วน 50/30/20 & 6 Jars
-│   ├── savings.js        # โมดูลเป้าหมายการออม & ดอกเบี้ยทบต้น
-│   ├── tax.js            # โมดูลคำนวณภาษีบุคคลธรรมดา
-│   └── reports.js        # โมดูล Chart.js & ส่งออกข้อมูล
-├── .gitignore
+FE_wallet/
+├── index.html                  # HTML Root Entry
+├── package.json                # Dependencies: React 18, Vite, Lucide React, Chart.js
+├── vite.config.js              # Vite Config
+├── src/
+│   ├── main.jsx                # React Entry Point
+│   ├── App.jsx                 # App Shell & Router
+│   ├── index.css               # Design System & Theme Styles
+│   ├── context/
+│   │   └── WalletContext.jsx   # Global State & LocalStorage Sync
+│   ├── data/
+│   │   ├── demoData.js         # Realistic Thai Financial Scenario
+│   │   └── constants.js        # Categories & Presets
+│   ├── utils/
+│   │   ├── formatters.js       # Thai Baht & Date Formatters
+│   │   └── taxCalculator.js    # Thai Tax ภ.ง.ด. 90/91 Calculation Engine
+│   └── components/
+│       ├── common/
+│       │   ├── Navbar.jsx
+│       │   ├── StatCard.jsx
+│       │   ├── Modal.jsx
+│       │   └── Toast.jsx
+│       ├── modals/
+│       │   ├── AddTransactionModal.jsx
+│       │   ├── AddFixedCostModal.jsx
+│       │   ├── AddGoalModal.jsx
+│       │   └── QuickDepositModal.jsx
+│       └── tabs/
+│           ├── DashboardTab.jsx
+│           ├── TransactionsTab.jsx
+│           ├── FixedCostsTab.jsx
+│           ├── ProjectionTab.jsx
+│           ├── AllocationTab.jsx
+│           ├── SavingsTab.jsx
+│           ├── TaxTab.jsx
+│           └── ReportsTab.jsx
 └── README.md
 ```
 
 ---
 
-## 🚀 วิธีเปิดใช้งาน
+## 🚀 วิธีการรันโปรเจกต์ (Development & Build)
 
-เปิดไฟล์ `index.html` บนเบราว์เซอร์ได้โดยตรง หรือรันผ่าน Live Server / HTTP Server:
-
+### 1. ติดตั้ง Dependencies
 ```bash
-# เปิดด้วย Node.js serve
-npx -y serve .
-
-# หรือเปิดด้วย Python
-python -m http.server 8000
+npm install
 ```
+
+### 2. รันโหมด Development Server
+```bash
+npm run dev
+```
+เปิดเบราว์เซอร์ไปที่: `http://localhost:3000`
+
+### 3. Build สำหรับ Production
+```bash
+npm run build
+```
+ไฟล์ production bundle จะถูกสร้างไว้ในโฟลเดอร์ `dist/`
