@@ -49,3 +49,17 @@ export const getCurrentMonthPrefix = () => {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   return `${year}-${month}`;
 };
+
+const THAI_MONTHS_SHORT = [
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+];
+
+/**
+ * Formats a { year, month } pair (month 1-12) as a Thai short month with a
+ * Buddhist-era year, e.g. { year: 2031, month: 3 } -> "มี.ค. 2574"
+ */
+export const formatMonthLabel = (m) => {
+  if (!m || !m.year || !m.month) return '-';
+  return `${THAI_MONTHS_SHORT[m.month - 1]} ${m.year + 543}`;
+};
