@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { simulate } from './engine/payoffSimulator';
 import { PayoffSummaryCards } from './PayoffSummaryCards';
+import { BudgetProfilePanel } from './BudgetProfilePanel';
 
 export const DebtTab = () => {
   const { debts, budgetProfile } = useWallet();
@@ -38,14 +39,18 @@ export const DebtTab = () => {
         debtCount={openDebts.length}
       />
 
-      {openDebts.length === 0 && (
-        <div className="card p-6 text-center">
-          <div className="font-bold text-base mb-1">ยังไม่มีรายการหนี้ในแผน</div>
-          <p className="text-xs text-muted">
-            เพิ่มหนี้ก้อนแรกเพื่อเริ่มคำนวณวันปลอดหนี้
-          </p>
+      <div className="grid grid-cols-3 gap-6 mb-4">
+        <BudgetProfilePanel />
+
+        <div className="card" style={{ gridColumn: 'span 2' }}>
+          <div className="card-header">
+            <div>
+              <div className="card-title">รายการหนี้</div>
+              <div className="card-subtitle">เพิ่มในขั้นถัดไป</div>
+            </div>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
