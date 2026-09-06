@@ -98,7 +98,6 @@
 **Interfaces:**
 - Consumes: nothing
 - Produces:
-  - `round2(n: number) => number`
   - `periodsRemaining(debt) => number`
   - `outstandingBalance(debt) => number`
   - `resolveSchedule(defaultValue: number, overrides: {fromMonth,amount}[], month: number) => number`
@@ -233,7 +232,6 @@ Create `src/features/debt/engine/__tests__/debtMath.test.js`:
 ```js
 import { describe, it, expect } from 'vitest';
 import {
-  round2,
   periodsRemaining,
   outstandingBalance,
   resolveSchedule,
@@ -244,13 +242,6 @@ import {
   rebateDecayPerMonth,
   addMonths
 } from '../debtMath';
-
-describe('round2', () => {
-  it('rounds to two decimals', () => {
-    expect(round2(3342.291666666)).toBe(3342.29);
-    expect(round2(609154.9533333)).toBe(609154.95);
-  });
-});
 
 describe('periodsRemaining', () => {
   it('subtracts paid from total', () => {
@@ -448,13 +439,10 @@ Create `src/features/debt/engine/debtMath.js`:
 /**
  * Pure math helpers for the debt payoff engine.
  *
- * Money is NOT rounded here except by round2, which callers use only at the
- * display and test-comparison boundary. Rounding inside the simulation loop
- * accumulates enough error over 54 months to break the golden vectors.
+ * Money is never rounded here. Rounding inside the simulation loop accumulates
+ * enough error over 54 months to break the golden vectors, so rounding happens
+ * only at the display boundary in the UI components.
  */
-
-/** Round to two decimals. Display and comparison boundary only. */
-export const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
 /** Installment periods still owed. Never negative. */
 export const periodsRemaining = (debt) =>
