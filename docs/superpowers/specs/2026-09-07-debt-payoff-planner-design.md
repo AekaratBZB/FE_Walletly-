@@ -329,6 +329,7 @@ noMoreCashComing = installmentTotal === 0        // every plan has expired
                 && emergencyContribution === 0   // fund is at target
                 && buffer === 0
                 && no override has fromMonth > month   // schedules exhausted
+                && every open loan's holdingPot is empty  // no annual payment pending
 
 if noMoreCashComing and totalDebt >= totalDebt(previous month):
     IsInfeasible = true
