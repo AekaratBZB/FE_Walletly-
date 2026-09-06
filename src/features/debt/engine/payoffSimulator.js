@@ -1,0 +1,348 @@
+import {
+  periodsRemaining,
+  resolveSchedule,
+  hasFutureOverride,
+  monthlyInterest,
+  minimumDue,
+  addMonths
+} from './debtMath';
+
+const MAX_MONTHS_DEFAULT = 600;
+
+/** Half a satang. Real balances are never smaller, so this is a safe zero. */
+const EPS = 0.005;
+
+/** Mutable per-month copy of an amortizing debt. The input array is never touched. */
+const makeWorkingLoan = (d) => ({
+  id: d.id,
+  name: d.name,
+  principal: Number(d.principal) || 0,
+  accruedInterest: Number(d.accruedInterest) || 0,
+  annualRatePct: Number(d.annualRatePct) || 0,
+  // undefined means yes; only an explicit false switches on the holding-pot path
+  acceptsEarlyPayment: d.acceptsEarlyPayment !== false,
+  annualDueMonth: Number(d.annualDueMonth) || null,
+  minimumPayment: d.minimumPayment || { mode: 'none' },
+  holdingPot: 0,
+  isClosed: false
+});
+
+/**
+ * Apply a payment. THIS ORDER IS MANDATORY: accrued interest is cleared before
+ * anything touches principal. Any other order silently understates the payoff
+ * period.
+ */
+const pay = (loan, amount) => {
+  const p = Math.min(amount, loan.accruedInterest + loan.principal);
+  if (p <= 0) return { paid: 0, interestPortion: 0, principalPortion: 0 };
+  const interestPortion = Math.min(p, loan.accruedInterest);
+  const principalPortion = p - interestPortion;
+  loan.accruedInterest -= interestPortion;
+  loan.principal -= principalPortion;
+  return { paid: p, interestPortion, principalPortion };
+};
+
+const balanceOf = (loan) => loan.principal + loan.accruedInterest;
+
+/** Which single debt gets the money left after every minimum is paid. */
+const pickTarget = (openLoans, budget) => {
+  if (!openLoans.length) return null;
+
+  if (budget.strategy === 'snowball') {
+    return openLoans.reduce((best, l) => (balanceOf(l) < balanceOf(best) ? l : best));
+  }
+
+  if (budget.strategy === 'manual') {
+    for (const id of budget.manualOrder || []) {
+      const found = openLoans.find((l) => l.id === id);
+      if (found) return found;
+    }
+    return openLoans[0];
+  }
+
+  // avalanche: highest rate wins, ties broken by the smaller balance
+  return openLoans.reduce((best, l) => {
+    if (l.annualRatePct > best.annualRatePct) return l;
+    if (l.annualRatePct === best.annualRatePct && balanceOf(l) < balanceOf(best)) return l;
+    return best;
+  });
+};
+
+/**
+ * Month-by-month cash-flow simulation.
+ *
+ * Pure: no I/O, no DB, no clock. startMonth is passed in so the UI can re-run
+ * this on every slider drag and the tests can pin "Month 0 = October".
+ *
+ * @param {import('./types').Debt[]} debts
+ * @param {import('./types').BudgetProfile} budget
+ * @param {{ maxMonths?: number, startMonth?: import('./types').YearMonth }} [options]
+ * @returns {import('./types').Projection}
+ */
+export const simulate = (debts, budget, options = {}) => {
+  const maxMonths = options.maxMonths || MAX_MONTHS_DEFAULT;
+  const startMonth = options.startMonth || { year: 2026, month: 1 };
+
+  const active = (debts || []).filter((d) => !d.isClosed);
+
+  const fixedObligations = active
+    .filter((d) => d.type === 'hirePurchase' || d.type === 'installment')
+    .map((d) => ({
+      monthlyPayment: Number(d.monthlyPayment) || 0,
+      periods: periodsRemaining(d)
+    }));
+
+  const loans = active.filter((d) => d.type === 'amortizing').map(makeWorkingLoan);
+
+  const income = Number(budget.netMonthlyIncome) || 0;
+  const extraIncome = Number(budget.extraIncome) || 0;
+  const fixedExpenses = Number(budget.fixedExpenses) || 0;
+  const discretionaryBudget = Number(budget.discretionaryBudget) || 0;
+  const fundTarget = Number(budget.emergencyFundTarget) || 0;
+  let fundCurrent = Number(budget.emergencyFundCurrent) || 0;
+
+  const monthlyInterestThreshold = loans.reduce((s, l) => s + monthlyInterest(l), 0);
+
+  const months = [];
+  let totalInterestPaid = 0;
+  let interestArrearsClearedMonth = null;
+  const startedWithArrears = loans.some((l) => l.accruedInterest > EPS);
+  let isInfeasible = false;
+  let minimumViablePayment = null;
+  let prevTotalDebt = loans.reduce((s, l) => s + balanceOf(l), 0);
+
+  for (let month = 0; month < maxMonths; month++) {
+    const installmentTotal = fixedObligations.reduce(
+      (s, o) => s + (month < o.periods ? o.monthlyPayment : 0),
+      0
+    );
+
+    const openLoans = loans.filter((l) => !l.isClosed);
+
+    // Debt free: no interest-bearing debt left AND no installment plans running.
+    if (!openLoans.length && installmentTotal === 0) break;
+
+    const surplus =
+      income + extraIncome - fixedExpenses - discretionaryBudget - installmentTotal;
+
+    // Interest accrues even in a month the budget cannot cover, so the recorded
+    // row stays honest.
+    if (surplus < 0) {
+      let accrued = 0;
+      for (const loan of openLoans) {
+        const i = monthlyInterest(loan);
+        loan.accruedInterest += i;
+        accrued += i;
+      }
+      isInfeasible = true;
+      minimumViablePayment = openLoans.reduce((s, l) => s + monthlyInterest(l), 0);
+      months.push({
+        Index: month,
+        Month: addMonths(startMonth, month),
+        InstallmentTotal: installmentTotal,
+        Surplus: surplus,
+        EmergencyContribution: 0,
+        LoanPayment: 0,
+        HeldForAnnualPayment: 0,
+        InterestAccrued: accrued,
+        AccruedInterestBalance: loans.reduce((s, l) => s + l.accruedInterest, 0),
+        PrincipalBalance: loans.reduce((s, l) => s + l.principal, 0),
+        EmergencyFundBalance: fundCurrent,
+        DiscretionaryCeiling:
+          income + extraIncome - fixedExpenses - installmentTotal - accrued,
+        perDebt: loans.map((l) => ({
+          debtId: l.id,
+          paid: 0,
+          interestPortion: 0,
+          principalPortion: 0,
+          balance: balanceOf(l),
+          held: l.holdingPot
+        }))
+      });
+      break;
+    }
+
+    // The emergency fund is served before any debt, capped at the target.
+    const contribution = resolveSchedule(
+      budget.emergencyMonthlyContribution,
+      budget.emergencyContributionOverrides,
+      month
+    );
+    const emergencyContribution = Math.min(
+      contribution,
+      Math.max(0, fundTarget - fundCurrent),
+      Math.max(0, surplus)
+    );
+    fundCurrent += emergencyContribution;
+
+    const buffer = resolveSchedule(budget.shortTermBuffer, budget.bufferOverrides, month);
+    let availableForLoan = Math.max(0, surplus - emergencyContribution - buffer);
+
+    // ACCRUE FIRST, then pay. Reversing this shifts every row by one month.
+    let interestAccrued = 0;
+    for (const loan of openLoans) {
+      const i = monthlyInterest(loan);
+      loan.accruedInterest += i;
+      interestAccrued += i;
+    }
+
+    const paidByDebt = new Map();
+    const record = (loan, r) => {
+      const cur = paidByDebt.get(loan.id) || {
+        paid: 0,
+        interestPortion: 0,
+        principalPortion: 0
+      };
+      cur.paid += r.paid;
+      cur.interestPortion += r.interestPortion;
+      cur.principalPortion += r.principalPortion;
+      paidByDebt.set(loan.id, cur);
+    };
+
+    let loanPayment = 0;
+    let interestPaidThisMonth = 0;
+    let heldThisMonth = 0;
+
+    // Minimums on every loan that accepts monthly payment. A loan with
+    // acceptsEarlyPayment === false has no monthly obligation at all.
+    for (const loan of openLoans) {
+      if (!loan.acceptsEarlyPayment) continue;
+      if (availableForLoan <= 0) break;
+      const due = Math.min(minimumDue(loan), availableForLoan);
+      if (due <= 0) continue;
+      const r = pay(loan, due);
+      availableForLoan -= r.paid;
+      loanPayment += r.paid;
+      interestPaidThisMonth += r.interestPortion;
+      record(loan, r);
+    }
+
+    // Everything left attacks one debt.
+    if (availableForLoan > 0) {
+      const target = pickTarget(openLoans, budget);
+      if (target) {
+        if (!target.acceptsEarlyPayment) {
+          target.holdingPot += availableForLoan;
+          heldThisMonth += availableForLoan;
+          availableForLoan = 0;
+        } else {
+          const r = pay(target, availableForLoan);
+          availableForLoan -= r.paid;
+          loanPayment += r.paid;
+          interestPaidThisMonth += r.interestPortion;
+          record(target, r);
+        }
+      }
+    }
+
+    // Release any holding pot whose annual due month is this calendar month.
+    const calendarMonth = addMonths(startMonth, month).month;
+    for (const loan of openLoans) {
+      if (loan.acceptsEarlyPayment) continue;
+      if (loan.holdingPot <= 0) continue;
+      if (loan.annualDueMonth !== calendarMonth) continue;
+      const r = pay(loan, loan.holdingPot);
+      loan.holdingPot -= r.paid;
+      loanPayment += r.paid;
+      interestPaidThisMonth += r.interestPortion;
+      record(loan, r);
+    }
+
+    totalInterestPaid += interestPaidThisMonth;
+
+    for (const loan of openLoans) {
+      if (
+        loan.principal <= EPS &&
+        loan.accruedInterest <= EPS &&
+        loan.holdingPot <= EPS
+      ) {
+        loan.isClosed = true;
+      }
+    }
+
+    const arrearsBalance = loans.reduce((s, l) => s + l.accruedInterest, 0);
+    if (
+      interestArrearsClearedMonth === null &&
+      startedWithArrears &&
+      arrearsBalance <= EPS
+    ) {
+      interestArrearsClearedMonth = month;
+    }
+
+    months.push({
+      Index: month,
+      Month: addMonths(startMonth, month),
+      InstallmentTotal: installmentTotal,
+      Surplus: surplus,
+      EmergencyContribution: emergencyContribution,
+      LoanPayment: loanPayment,
+      HeldForAnnualPayment: heldThisMonth,
+      InterestAccrued: interestAccrued,
+      AccruedInterestBalance: arrearsBalance,
+      PrincipalBalance: loans.reduce((s, l) => s + l.principal, 0),
+      EmergencyFundBalance: fundCurrent,
+      DiscretionaryCeiling:
+        income + extraIncome - fixedExpenses - installmentTotal - interestAccrued,
+      perDebt: loans.map((l) => {
+        const r = paidByDebt.get(l.id) || {
+          paid: 0,
+          interestPortion: 0,
+          principalPortion: 0
+        };
+        return {
+          debtId: l.id,
+          paid: r.paid,
+          interestPortion: r.interestPortion,
+          principalPortion: r.principalPortion,
+          balance: balanceOf(l),
+          held: l.holdingPot
+        };
+      })
+    });
+
+    // Non-termination guard. The source spec's "payment <= interest" rule is
+    // wrong: that holds for the first seven months of its own fixture, which
+    // is feasible because the installment plans are about to expire and free
+    // up cash. Only stop when no new cash can ever arrive.
+    const stillOpen = loans.filter((l) => !l.isClosed);
+    if (stillOpen.length) {
+      const noMoreCashComing =
+        installmentTotal === 0 &&
+        emergencyContribution === 0 &&
+        buffer === 0 &&
+        !hasFutureOverride(budget.emergencyContributionOverrides, month) &&
+        !hasFutureOverride(budget.bufferOverrides, month) &&
+        // Cash sitting in a holding pot IS on its way — it lands in the annual
+        // due month. Without this the annual path is wrongly flagged
+        // infeasible once the installments expire.
+        stillOpen.every((l) => l.holdingPot <= EPS);
+
+      const totalDebt = stillOpen.reduce((s, l) => s + balanceOf(l), 0);
+      if (noMoreCashComing && totalDebt >= prevTotalDebt) {
+        isInfeasible = true;
+        minimumViablePayment = stillOpen.reduce((s, l) => s + monthlyInterest(l), 0);
+        break;
+      }
+      prevTotalDebt = totalDebt;
+    }
+  }
+
+  // Ran out of horizon with debt still open.
+  if (!isInfeasible && loans.some((l) => !l.isClosed) && months.length >= maxMonths) {
+    isInfeasible = true;
+    minimumViablePayment = loans
+      .filter((l) => !l.isClosed)
+      .reduce((s, l) => s + monthlyInterest(l), 0);
+  }
+
+  return {
+    Months: months,
+    MonthsToPayoff: months.length,
+    PayoffDate: months.length ? addMonths(startMonth, months.length - 1) : startMonth,
+    TotalInterestPaid: totalInterestPaid,
+    InterestArrearsClearedMonth: interestArrearsClearedMonth,
+    MonthlyInterestThreshold: monthlyInterestThreshold,
+    IsInfeasible: isInfeasible,
+    MinimumViablePayment: isInfeasible ? minimumViablePayment : null
+  };
+};
