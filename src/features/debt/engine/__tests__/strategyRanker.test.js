@@ -26,7 +26,7 @@ describe('rankDebts', () => {
   });
 
   it('costs the amortizing loan at the interest it will actually pay', () => {
-    expect(byId('loan-1').totalRemainingCost).toBeCloseTo(131445.49, 0);
+    expect(byId('loan-1').totalRemainingCost).toBeCloseTo(131445.49, 2);
   });
 
   it('ranks descending by cost, so the loan leads', () => {

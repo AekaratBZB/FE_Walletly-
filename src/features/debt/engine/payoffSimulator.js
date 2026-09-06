@@ -44,6 +44,43 @@ const pay = (loan, amount) => {
 
 const balanceOf = (loan) => loan.principal + loan.accruedInterest;
 
+/**
+ * Builds one MonthlyProjection row. Both the infeasible-budget early return
+ * and the normal end-of-iteration path funnel through here so the row's
+ * 13-key shape is declared exactly once. Values are passed through untouched
+ * — no rounding, no derived fields — this is purely a single point of truth
+ * for the shape.
+ */
+const buildMonthRow = ({
+  index,
+  month,
+  installmentTotal,
+  surplus,
+  emergencyContribution,
+  loanPayment,
+  heldForAnnualPayment,
+  interestAccrued,
+  arrearsBalance,
+  principalBalance,
+  emergencyFundBalance,
+  discretionaryCeiling,
+  perDebt
+}) => ({
+  Index: index,
+  Month: month,
+  InstallmentTotal: installmentTotal,
+  Surplus: surplus,
+  EmergencyContribution: emergencyContribution,
+  LoanPayment: loanPayment,
+  HeldForAnnualPayment: heldForAnnualPayment,
+  InterestAccrued: interestAccrued,
+  AccruedInterestBalance: arrearsBalance,
+  PrincipalBalance: principalBalance,
+  EmergencyFundBalance: emergencyFundBalance,
+  DiscretionaryCeiling: discretionaryCeiling,
+  perDebt
+});
+
 /** Which single debt gets the money left after every minimum is paid. */
 const pickTarget = (openLoans, budget) => {
   if (!openLoans.length) return null;
@@ -136,29 +173,31 @@ export const simulate = (debts, budget, options = {}) => {
       }
       isInfeasible = true;
       minimumViablePayment = openLoans.reduce((s, l) => s + monthlyInterest(l), 0);
-      months.push({
-        Index: month,
-        Month: addMonths(startMonth, month),
-        InstallmentTotal: installmentTotal,
-        Surplus: surplus,
-        EmergencyContribution: 0,
-        LoanPayment: 0,
-        HeldForAnnualPayment: 0,
-        InterestAccrued: accrued,
-        AccruedInterestBalance: loans.reduce((s, l) => s + l.accruedInterest, 0),
-        PrincipalBalance: loans.reduce((s, l) => s + l.principal, 0),
-        EmergencyFundBalance: fundCurrent,
-        DiscretionaryCeiling:
-          income + extraIncome - fixedExpenses - installmentTotal - accrued,
-        perDebt: loans.map((l) => ({
-          debtId: l.id,
-          paid: 0,
-          interestPortion: 0,
-          principalPortion: 0,
-          balance: balanceOf(l),
-          held: l.holdingPot
-        }))
-      });
+      months.push(
+        buildMonthRow({
+          index: month,
+          month: addMonths(startMonth, month),
+          installmentTotal,
+          surplus,
+          emergencyContribution: 0,
+          loanPayment: 0,
+          heldForAnnualPayment: 0,
+          interestAccrued: accrued,
+          arrearsBalance: loans.reduce((s, l) => s + l.accruedInterest, 0),
+          principalBalance: loans.reduce((s, l) => s + l.principal, 0),
+          emergencyFundBalance: fundCurrent,
+          discretionaryCeiling:
+            income + extraIncome - fixedExpenses - installmentTotal - accrued,
+          perDebt: loans.map((l) => ({
+            debtId: l.id,
+            paid: 0,
+            interestPortion: 0,
+            principalPortion: 0,
+            balance: balanceOf(l),
+            held: l.holdingPot
+          }))
+        })
+      );
       break;
     }
 
@@ -269,36 +308,38 @@ export const simulate = (debts, budget, options = {}) => {
       interestArrearsClearedMonth = month;
     }
 
-    months.push({
-      Index: month,
-      Month: addMonths(startMonth, month),
-      InstallmentTotal: installmentTotal,
-      Surplus: surplus,
-      EmergencyContribution: emergencyContribution,
-      LoanPayment: loanPayment,
-      HeldForAnnualPayment: heldThisMonth,
-      InterestAccrued: interestAccrued,
-      AccruedInterestBalance: arrearsBalance,
-      PrincipalBalance: loans.reduce((s, l) => s + l.principal, 0),
-      EmergencyFundBalance: fundCurrent,
-      DiscretionaryCeiling:
-        income + extraIncome - fixedExpenses - installmentTotal - interestAccrued,
-      perDebt: loans.map((l) => {
-        const r = paidByDebt.get(l.id) || {
-          paid: 0,
-          interestPortion: 0,
-          principalPortion: 0
-        };
-        return {
-          debtId: l.id,
-          paid: r.paid,
-          interestPortion: r.interestPortion,
-          principalPortion: r.principalPortion,
-          balance: balanceOf(l),
-          held: l.holdingPot
-        };
+    months.push(
+      buildMonthRow({
+        index: month,
+        month: addMonths(startMonth, month),
+        installmentTotal,
+        surplus,
+        emergencyContribution,
+        loanPayment,
+        heldForAnnualPayment: heldThisMonth,
+        interestAccrued,
+        arrearsBalance,
+        principalBalance: loans.reduce((s, l) => s + l.principal, 0),
+        emergencyFundBalance: fundCurrent,
+        discretionaryCeiling:
+          income + extraIncome - fixedExpenses - installmentTotal - interestAccrued,
+        perDebt: loans.map((l) => {
+          const r = paidByDebt.get(l.id) || {
+            paid: 0,
+            interestPortion: 0,
+            principalPortion: 0
+          };
+          return {
+            debtId: l.id,
+            paid: r.paid,
+            interestPortion: r.interestPortion,
+            principalPortion: r.principalPortion,
+            balance: balanceOf(l),
+            held: l.holdingPot
+          };
+        })
       })
-    });
+    );
 
     // Non-termination guard. The source spec's "payment <= interest" rule is
     // wrong: that holds for the first seven months of its own fixture, which
