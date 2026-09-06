@@ -233,61 +233,192 @@ a:hover {
 }
 
 .navbar {
-  max-width: 1400px;
+  max-width: 1480px;
   margin: 0 auto;
-  padding: 0.75rem 1.5rem;
+  padding: 0.65rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
+/* Modern FinTech Brand Logo */
 .brand-logo {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  font-family: var(--font-heading);
-  font-weight: 700;
-  font-size: 1.35rem;
-  color: var(--text-main);
+  gap: 0.85rem;
   text-decoration: none;
   cursor: pointer;
   user-select: none;
+  padding: 0.35rem 0.65rem;
+  margin: -0.35rem -0.65rem;
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-normal);
+  background: transparent;
+}
+
+.brand-logo:hover {
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05);
+}
+
+.brand-icon-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .brand-icon {
-  width: 38px;
-  height: 38px;
-  background: linear-gradient(135deg, var(--primary) 0%, #10b981 100%);
-  border-radius: var(--radius-md);
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, #064e3b 0%, #047857 30%, #059669 65%, #10b981 100%);
+  border-radius: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 4px 10px var(--primary-glow);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 
+    0 4px 14px -2px rgba(5, 150, 105, 0.45),
+    0 2px 6px -1px rgba(6, 182, 212, 0.2),
+    inset 0 1px 1px rgba(255, 255, 255, 0.5);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+  position: relative;
+  z-index: 2;
 }
 
-.brand-badge {
+.brand-icon-glow {
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.65), rgba(6, 182, 212, 0.45));
+  border-radius: 15px;
+  filter: blur(8px);
+  opacity: 0.35;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  z-index: 1;
+}
+
+.brand-logo:hover .brand-icon {
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 
+    0 8px 22px -3px rgba(5, 150, 105, 0.55),
+    0 3px 8px -1px rgba(6, 182, 212, 0.3),
+    inset 0 1px 2px rgba(255, 255, 255, 0.65);
+}
+
+.brand-logo:hover .brand-icon-glow {
+  opacity: 0.85;
+  transform: scale(1.15);
+}
+
+.brand-svg {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+  transition: transform 0.3s ease;
+}
+
+.brand-logo:hover .brand-svg {
+  transform: scale(1.02);
+}
+
+.brand-text-block {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.brand-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brand-name {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1.4rem;
+  letter-spacing: -0.035em;
+  color: #0f172a;
+}
+
+.brand-accent {
+  background: linear-gradient(135deg, #059669 0%, #10b981 50%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+}
+
+.brand-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.65rem;
-  background: var(--primary-light);
-  color: var(--primary);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
-  margin-left: 6px;
-  vertical-align: middle;
-  border: 1px solid rgba(5, 150, 105, 0.2);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #047857;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(6, 182, 212, 0.1) 100%);
+  border: 1px solid rgba(5, 150, 105, 0.28);
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.brand-chip-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 6px #10b981;
+  animation: pulseBrandDot 2s infinite ease-in-out;
+}
+
+@keyframes pulseBrandDot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 0.65;
+  }
+}
+
+.brand-subtext {
+  font-family: var(--font-number);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+@media (max-width: 680px) {
+  .brand-subtext {
+    display: none;
+  }
+  .brand-chip {
+    display: none;
+  }
+}
+
+.nav-tabs-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
 }
 
 .nav-tabs-wrapper {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
   background: var(--bg-subtle);
-  padding: 4px;
+  padding: 3px 4px;
   border-radius: var(--radius-lg);
   overflow-x: auto;
   scrollbar-width: none;
+  max-width: 100%;
 }
 
 .nav-tabs-wrapper::-webkit-scrollbar {
@@ -297,30 +428,72 @@ a:hover {
 .nav-tab-btn {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.5rem 0.9rem;
+  gap: 0.35rem;
+  padding: 0.42rem 0.65rem;
   border: none;
   background: transparent;
   color: var(--text-muted);
   font-family: var(--font-heading);
-  font-size: 0.875rem;
+  font-size: 0.82rem;
   font-weight: 500;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
   white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .nav-tab-btn:hover {
   color: var(--text-main);
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.65);
 }
 
 .nav-tab-btn.active {
   background: var(--bg-card);
   color: var(--primary);
   font-weight: 600;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.header-actions {
+  flex-shrink: 0;
+}
+
+@media (max-width: 1320px) {
+  .navbar {
+    padding: 0.6rem 0.85rem;
+    gap: 0.75rem;
+  }
+  .brand-subtext {
+    display: none;
+  }
+  .nav-tab-btn {
+    padding: 0.4rem 0.52rem;
+    font-size: 0.795rem;
+    gap: 0.3rem;
+  }
+}
+
+@media (max-width: 1140px) {
+  .brand-chip {
+    display: none;
+  }
+  .nav-tab-btn {
+    padding: 0.36rem 0.45rem;
+    font-size: 0.76rem;
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 980px) {
+  .nav-tabs-container {
+    justify-content: flex-start;
+  }
+  .nav-tabs-wrapper {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
 }
 
 /* Cards */
