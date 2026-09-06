@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { DEMO_DATA } from '../shared/demoData';
+import { useDebtState } from '../features/debt/useDebtState';
+import { DEFAULT_BUDGET_PROFILE } from '../features/debt/debtStorage';
 
 const STORAGE_KEYS = {
   TRANSACTIONS: 'finsmart_transactions_v1',
@@ -90,6 +92,15 @@ export const WalletProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.TAX_SETTINGS, JSON.stringify(taxSettings));
   }, [taxSettings]);
+
+  // Debt planner slice. Kept in its own hook so this file stops growing.
+  const debt = useDebtState({
+    addToast,
+    allocationSettings,
+    fixedCosts,
+    savingsGoals,
+    transactions
+  });
 
   // Transaction CRUD
   const addTransaction = (tx) => {
@@ -209,13 +220,15 @@ export const WalletProvider = ({ children }) => {
   // Export / Import / Reset / Clear
   const exportBackupJSON = () => {
     const backup = {
-      version: '2.0-react',
+      version: '2.1-react',
       exportedAt: new Date().toISOString(),
       transactions,
       fixedCosts,
       allocationSettings,
       savingsGoals,
-      taxSettings
+      taxSettings,
+      debts: debt.debts,
+      budgetProfile: debt.budgetProfile
     };
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -235,6 +248,8 @@ export const WalletProvider = ({ children }) => {
       if (data.allocationSettings) setAllocationSettings(data.allocationSettings);
       if (data.savingsGoals) setSavingsGoals(data.savingsGoals);
       if (data.taxSettings) setTaxSettings(data.taxSettings);
+      if (data.debts) debt.setDebts(data.debts);
+      if (data.budgetProfile) debt.setBudgetProfile(data.budgetProfile);
       addToast('นำเข้าข้อมูลสำเร็จเรียบร้อยแล้ว!', 'success');
       return { success: true };
     } catch (e) {
@@ -275,6 +290,8 @@ export const WalletProvider = ({ children }) => {
     setAllocationSettings(DEMO_DATA.allocationSettings);
     setSavingsGoals(DEMO_DATA.savingsGoals);
     setTaxSettings(DEMO_DATA.taxSettings);
+    debt.setDebts([]);
+    debt.setBudgetProfile(DEFAULT_BUDGET_PROFILE);
     addToast('โหลดข้อมูลตัวอย่าง (Demo Data) สำเร็จแล้ว!', 'success');
   };
 
@@ -309,6 +326,8 @@ export const WalletProvider = ({ children }) => {
       donationEducation: 0,
       withholdingTax: 0
     });
+    debt.setDebts([]);
+    debt.setBudgetProfile(DEFAULT_BUDGET_PROFILE);
     addToast('ล้างข้อมูลทั้งหมดในระบบเรียบร้อยแล้ว', 'info');
   };
 
@@ -349,7 +368,8 @@ export const WalletProvider = ({ children }) => {
         importBackupJSON,
         exportTransactionsCSV,
         resetToDemo,
-        clearAllData
+        clearAllData,
+        ...debt
       }}
     >
       {children}
