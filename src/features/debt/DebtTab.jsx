@@ -3,6 +3,7 @@ import { useWallet } from '../../context/WalletContext';
 import { simulate } from './engine/payoffSimulator';
 import { PayoffSummaryCards } from './PayoffSummaryCards';
 import { BudgetProfilePanel } from './BudgetProfilePanel';
+import { DebtListPanel } from './DebtListPanel';
 
 export const DebtTab = () => {
   const { debts, budgetProfile } = useWallet();
@@ -41,15 +42,7 @@ export const DebtTab = () => {
 
       <div className="grid grid-cols-3 gap-6 mb-4">
         <BudgetProfilePanel />
-
-        <div className="card" style={{ gridColumn: 'span 2' }}>
-          <div className="card-header">
-            <div>
-              <div className="card-title">รายการหนี้</div>
-              <div className="card-subtitle">เพิ่มในขั้นถัดไป</div>
-            </div>
-          </div>
-        </div>
+        <DebtListPanel />
       </div>
     </div>
   );

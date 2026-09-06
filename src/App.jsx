@@ -11,6 +11,7 @@ import { FixedCostsTab } from './features/fixed-costs/FixedCostsTab';
 import { AddFixedCostModal } from './features/fixed-costs/AddFixedCostModal';
 import { ProjectionTab } from './features/projection/ProjectionTab';
 import { DebtTab } from './features/debt/DebtTab';
+import { AddDebtModal } from './features/debt/AddDebtModal';
 import { AllocationTab } from './features/allocation/AllocationTab';
 import { SavingsTab } from './features/savings/SavingsTab';
 import { AddGoalModal } from './features/savings/AddGoalModal';
@@ -78,6 +79,7 @@ export const App = () => {
       <AddFixedCostModal />
       <AddGoalModal />
       <QuickDepositModal />
+      <AddDebtModal />
 
       {/* Toast Notifications */}
       <ToastContainer />
