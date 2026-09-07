@@ -10,11 +10,6 @@ import { CalendarCheck, Coins, TrendingDown, AlertTriangle } from 'lucide-react'
  * projection rests on user-entered numbers, so if the food budget is a guess,
  * the payoff date is a guess.
  */
-// Float subtraction in the engine can leave residues like -7.97e-14, which
-// Math.round turns into -0. Adding 0 folds -0 back to 0 so the UI never
-// shows a sign on a value that is actually zero.
-const roundMoney = (x) => Math.round(x) + 0;
-
 export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => {
   const last = projection.Months.length
     ? projection.Months[projection.Months.length - 1]
@@ -50,7 +45,7 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => 
 
         <StatCard
           label="ดอกเบี้ยที่จะจ่ายรวม"
-          value={formatCurrency(roundMoney(projection.TotalInterestPaid))}
+          value={formatCurrency(Math.round(projection.TotalInterestPaid))}
           subtext="ตลอดแผน ตามตัวเลขที่กรอก"
           icon={Coins}
           colorScheme="amber"
@@ -59,7 +54,7 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => 
 
         <StatCard
           label="จุดคุ้มดอกเบี้ยต่อเดือน"
-          value={`${formatCurrency(roundMoney(projection.MonthlyInterestThreshold))}/ด.`}
+          value={`${formatCurrency(Math.round(projection.MonthlyInterestThreshold))}/ด.`}
           subtext="ขีดจำกัด ไม่ใช่เป้า — ต่ำกว่านี้หนี้ไม่ลด"
           icon={TrendingDown}
           colorScheme="blue"
@@ -69,7 +64,7 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => 
         <StatCard
           label={projection.IsInfeasible ? 'หนี้คงเหลือ ณ เดือนที่หยุดคำนวณ' : 'หนี้ตั้งต้นทั้งหมด'}
           value={formatCurrency(
-            roundMoney(projection.IsInfeasible ? debtRemaining : startingDebt)
+            Math.round(projection.IsInfeasible ? debtRemaining : startingDebt)
           )}
           subtext={`${debtCount} รายการในแผน`}
           icon={AlertTriangle}
@@ -90,7 +85,7 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => 
             เงินที่เหลือไปชำระหนี้น้อยกว่าดอกเบี้ยที่เดินในแต่ละเดือน หนี้จึงไม่ลดลง
             ต้องมีเงินเข้าชำระหนี้อย่างน้อย{' '}
             <b className="num-font">
-              {formatCurrency(roundMoney(projection.MinimumViablePayment || 0))}
+              {formatCurrency(Math.round(projection.MinimumViablePayment || 0))}
             </b>{' '}
             ต่อเดือน หนี้จึงจะเริ่มลด — ลดงบกินใช้ หรือเพิ่มรายได้เสริม
           </p>

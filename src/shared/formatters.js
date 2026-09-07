@@ -6,7 +6,12 @@ export const formatCurrency = (amount, includeSymbol = true, decimals = 0) => {
   if (amount === undefined || amount === null || isNaN(amount)) {
     return includeSymbol ? '0 ฿' : '0';
   }
-  const formatted = Number(amount).toLocaleString('th-TH', {
+  // Float subtraction upstream (e.g. in the debt engine) can leave residues
+  // like -7.97e-14, and Math.round of those is -0. (-0).toLocaleString() is
+  // "-0", so fold -0 back to 0 here — adding 0 leaves every real value
+  // (including genuine negatives) untouched: -0 + 0 === 0, -1234 + 0 === -1234.
+  const normalized = Number(amount) + 0;
+  const formatted = normalized.toLocaleString('th-TH', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals
   });

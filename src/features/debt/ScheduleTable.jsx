@@ -71,6 +71,12 @@ export const ScheduleTable = ({ projection }) => {
               );
               const principalStuck = principalRepaid <= 0.005;
               const isArrearsCleared = projection.InterestArrearsClearedMonth === m.Index;
+              // HeldForAnnualPayment is what was ADDED to holding pots this
+              // month, not what remains in them — on the month a pot pays
+              // out, the whole pot empties in the same row, so that field
+              // would misreport cash as still set aside. Sum the per-debt
+              // pot balances that actually remain at month end instead.
+              const heldRemaining = m.perDebt.reduce((sum, d) => sum + d.held, 0);
 
               return (
                 <tr
@@ -100,9 +106,9 @@ export const ScheduleTable = ({ projection }) => {
                   </td>
                   <td className="text-right num-font text-xs text-success font-semibold">
                     {formatCurrency(Math.round(m.LoanPayment))}
-                    {m.HeldForAnnualPayment > 0 && (
+                    {heldRemaining > 0.005 && (
                       <div className="text-xs text-warning">
-                        กองไว้ {formatCurrency(Math.round(m.HeldForAnnualPayment))}
+                        กองไว้ {formatCurrency(Math.round(heldRemaining))}
                       </div>
                     )}
                   </td>

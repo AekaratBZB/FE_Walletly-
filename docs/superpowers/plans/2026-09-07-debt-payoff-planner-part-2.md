@@ -374,9 +374,35 @@ panels still stubbed. That makes the next tasks independently reviewable.
   - `<PayoffSummaryCards projection budgetProfile debtCount />`
   - `<DebtTab />`
 
-- [ ] **Step 1: Add `formatMonthLabel` to the shared formatters**
+- [ ] **Step 1: Fold negative zero in `formatCurrency`, then add `formatMonthLabel`**
 
-Append to `src/shared/formatters.js`:
+The debt engine never rounds mid-loop, so float subtraction can leave
+residues like `-7.97e-14` in a value the UI then does `Math.round(...)` on.
+`Math.round(-7.97e-14)` is `-0`, and `(-0).toLocaleString('th-TH', ...)` is
+`"-0"` — so any display call site can render `-0 ฿`. Fix this once, in the
+shared formatter, rather than at each call site (patching call sites is how
+this bug came back after being "fixed" twice already). Modify
+`formatCurrency` in `src/shared/formatters.js`:
+
+```js
+export const formatCurrency = (amount, includeSymbol = true, decimals = 0) => {
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return includeSymbol ? '0 ฿' : '0';
+  }
+  // Float subtraction upstream (e.g. in the debt engine) can leave residues
+  // like -7.97e-14, and Math.round of those is -0. (-0).toLocaleString() is
+  // "-0", so fold -0 back to 0 here — adding 0 leaves every real value
+  // (including genuine negatives) untouched: -0 + 0 === 0, -1234 + 0 === -1234.
+  const normalized = Number(amount) + 0;
+  const formatted = normalized.toLocaleString('th-TH', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  });
+  return includeSymbol ? `${formatted} ฿` : formatted;
+};
+```
+
+Then append `formatMonthLabel` to the same file:
 
 ```js
 const THAI_MONTHS_SHORT = [
@@ -434,12 +460,11 @@ import { CalendarCheck, Coins, TrendingDown, AlertTriangle } from 'lucide-react'
  * The assumptions box is always visible and never a tooltip: the whole
  * projection rests on user-entered numbers, so if the food budget is a guess,
  * the payoff date is a guess.
+ *
+ * Values go through `Math.round` then `formatCurrency` like every other
+ * display site in this feature — `formatCurrency` folds any -0 that
+ * produces, so there is no local rounding helper here.
  */
-// Float subtraction in the engine can leave residues like -7.97e-14, which
-// Math.round turns into -0. Adding 0 folds -0 back to 0 so the UI never
-// shows a sign on a value that is actually zero.
-const roundMoney = (x) => Math.round(x) + 0;
-
 export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => {
   const last = projection.Months.length
     ? projection.Months[projection.Months.length - 1]
@@ -475,7 +500,7 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => 
 
         <StatCard
           label="ดอกเบี้ยที่จะจ่ายรวม"
-          value={formatCurrency(roundMoney(projection.TotalInterestPaid))}
+          value={formatCurrency(Math.round(projection.TotalInterestPaid))}
           subtext="ตลอดแผน ตามตัวเลขที่กรอก"
           icon={Coins}
           colorScheme="amber"
@@ -484,7 +509,7 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => 
 
         <StatCard
           label="จุดคุ้มดอกเบี้ยต่อเดือน"
-          value={`${formatCurrency(roundMoney(projection.MonthlyInterestThreshold))}/ด.`}
+          value={`${formatCurrency(Math.round(projection.MonthlyInterestThreshold))}/ด.`}
           subtext="ขีดจำกัด ไม่ใช่เป้า — ต่ำกว่านี้หนี้ไม่ลด"
           icon={TrendingDown}
           colorScheme="blue"
@@ -494,7 +519,7 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => 
         <StatCard
           label={projection.IsInfeasible ? 'หนี้คงเหลือ ณ เดือนที่หยุดคำนวณ' : 'หนี้ตั้งต้นทั้งหมด'}
           value={formatCurrency(
-            roundMoney(projection.IsInfeasible ? debtRemaining : startingDebt)
+            Math.round(projection.IsInfeasible ? debtRemaining : startingDebt)
           )}
           subtext={`${debtCount} รายการในแผน`}
           icon={AlertTriangle}
@@ -515,7 +540,7 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => 
             เงินที่เหลือไปชำระหนี้น้อยกว่าดอกเบี้ยที่เดินในแต่ละเดือน หนี้จึงไม่ลดลง
             ต้องมีเงินเข้าชำระหนี้อย่างน้อย{' '}
             <b className="num-font">
-              {formatCurrency(roundMoney(projection.MinimumViablePayment || 0))}
+              {formatCurrency(Math.round(projection.MinimumViablePayment || 0))}
             </b>{' '}
             ต่อเดือน หนี้จึงจะเริ่มลด — ลดงบกินใช้ หรือเพิ่มรายได้เสริม
           </p>
