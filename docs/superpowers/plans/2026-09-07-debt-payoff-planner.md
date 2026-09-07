@@ -818,22 +818,25 @@ const balanceOf = (loan) => loan.principal + loan.accruedInterest;
 
 /** Which single debt gets the money left after every minimum is paid. */
 const pickTarget = (openLoans, budget) => {
-  if (!openLoans.length) return null;
+  // A loan that already owes nothing has nothing left to attack — sending it
+  // more money would just pile up in its holding pot forever.
+  const candidates = openLoans.filter((l) => balanceOf(l) > EPS);
+  if (!candidates.length) return null;
 
   if (budget.strategy === 'snowball') {
-    return openLoans.reduce((best, l) => (balanceOf(l) < balanceOf(best) ? l : best));
+    return candidates.reduce((best, l) => (balanceOf(l) < balanceOf(best) ? l : best));
   }
 
   if (budget.strategy === 'manual') {
     for (const id of budget.manualOrder || []) {
-      const found = openLoans.find((l) => l.id === id);
+      const found = candidates.find((l) => l.id === id);
       if (found) return found;
     }
-    return openLoans[0];
+    return candidates[0];
   }
 
   // avalanche: highest rate wins, ties broken by the smaller balance
-  return openLoans.reduce((best, l) => {
+  return candidates.reduce((best, l) => {
     if (l.annualRatePct > best.annualRatePct) return l;
     if (l.annualRatePct === best.annualRatePct && balanceOf(l) < balanceOf(best)) return l;
     return best;
@@ -1023,12 +1026,12 @@ export const simulate = (debts, budget, options = {}) => {
     totalInterestPaid += interestPaidThisMonth;
 
     for (const loan of openLoans) {
-      if (
-        loan.principal <= EPS &&
-        loan.accruedInterest <= EPS &&
-        loan.holdingPot <= EPS
-      ) {
+      if (loan.principal <= EPS && loan.accruedInterest <= EPS) {
         loan.isClosed = true;
+        // The debt is gone — any cash still sitting in its pot is no longer
+        // earmarked for it and must not be treated as an outstanding
+        // obligation (see the non-termination guard's holdingPot check).
+        loan.holdingPot = 0;
       }
     }
 
@@ -1250,6 +1253,27 @@ describe('edge 3: acceptsEarlyPayment false with an annual due month', () => {
     expect(held.Months[0].LoanPayment).toBeCloseTo(0, 2);
     expect(held.Months[0].HeldForAnnualPayment).toBeCloseTo(2015.34, 2);
     expect(held.Months[8].LoanPayment).toBeGreaterThan(0);
+  });
+
+  // The loan genuinely pays off in real time. A pickTarget that keeps
+  // shovelling money into a closed loan's holding pot, or a closing
+  // condition that can never see an empty pot, both regress to a run that
+  // grinds on to maxMonths — this pins that down.
+  it('actually terminates instead of running to the horizon', () => {
+    expect(held.MonthsToPayoff).toBeLessThan(200);
+    expect(held.MonthsToPayoff).toBeLessThan(600);
+  });
+
+  it('is feasible: the debt does get paid off', () => {
+    expect(held.IsInfeasible).toBe(false);
+  });
+
+  it('leaves no holding pot outstanding once the loan closes', () => {
+    const last = held.Months[held.Months.length - 1];
+    const heldAmounts = last.perDebt.map((d) => d.held);
+    for (const h of heldAmounts) {
+      expect(h).toBeCloseTo(0, 2);
+    }
   });
 });
 

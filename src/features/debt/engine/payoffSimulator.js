@@ -83,22 +83,25 @@ const buildMonthRow = ({
 
 /** Which single debt gets the money left after every minimum is paid. */
 const pickTarget = (openLoans, budget) => {
-  if (!openLoans.length) return null;
+  // A loan that already owes nothing has nothing left to attack — sending it
+  // more money would just pile up in its holding pot forever.
+  const candidates = openLoans.filter((l) => balanceOf(l) > EPS);
+  if (!candidates.length) return null;
 
   if (budget.strategy === 'snowball') {
-    return openLoans.reduce((best, l) => (balanceOf(l) < balanceOf(best) ? l : best));
+    return candidates.reduce((best, l) => (balanceOf(l) < balanceOf(best) ? l : best));
   }
 
   if (budget.strategy === 'manual') {
     for (const id of budget.manualOrder || []) {
-      const found = openLoans.find((l) => l.id === id);
+      const found = candidates.find((l) => l.id === id);
       if (found) return found;
     }
-    return openLoans[0];
+    return candidates[0];
   }
 
   // avalanche: highest rate wins, ties broken by the smaller balance
-  return openLoans.reduce((best, l) => {
+  return candidates.reduce((best, l) => {
     if (l.annualRatePct > best.annualRatePct) return l;
     if (l.annualRatePct === best.annualRatePct && balanceOf(l) < balanceOf(best)) return l;
     return best;
@@ -290,12 +293,12 @@ export const simulate = (debts, budget, options = {}) => {
     totalInterestPaid += interestPaidThisMonth;
 
     for (const loan of openLoans) {
-      if (
-        loan.principal <= EPS &&
-        loan.accruedInterest <= EPS &&
-        loan.holdingPot <= EPS
-      ) {
+      if (loan.principal <= EPS && loan.accruedInterest <= EPS) {
         loan.isClosed = true;
+        // The debt is gone — any cash still sitting in its pot is no longer
+        // earmarked for it and must not be treated as an outstanding
+        // obligation (see the non-termination guard's holdingPot check).
+        loan.holdingPot = 0;
       }
     }
 

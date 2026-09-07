@@ -93,6 +93,27 @@ describe('edge 3: acceptsEarlyPayment false with an annual due month', () => {
     expect(held.Months[0].HeldForAnnualPayment).toBeCloseTo(2015.34, 2);
     expect(held.Months[8].LoanPayment).toBeGreaterThan(0);
   });
+
+  // The loan genuinely pays off in real time. A pickTarget that keeps
+  // shovelling money into a closed loan's holding pot, or a closing
+  // condition that can never see an empty pot, both regress to a run that
+  // grinds on to maxMonths — this pins that down.
+  it('actually terminates instead of running to the horizon', () => {
+    expect(held.MonthsToPayoff).toBeLessThan(200);
+    expect(held.MonthsToPayoff).toBeLessThan(600);
+  });
+
+  it('is feasible: the debt does get paid off', () => {
+    expect(held.IsInfeasible).toBe(false);
+  });
+
+  it('leaves no holding pot outstanding once the loan closes', () => {
+    const last = held.Months[held.Months.length - 1];
+    const heldAmounts = last.perDebt.map((d) => d.held);
+    for (const h of heldAmounts) {
+      expect(h).toBeCloseTo(0, 2);
+    }
+  });
 });
 
 describe('edge 4: every debt closed', () => {
