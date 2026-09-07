@@ -5,6 +5,8 @@ import { PayoffSummaryCards } from './PayoffSummaryCards';
 import { BudgetProfilePanel } from './BudgetProfilePanel';
 import { DebtListPanel } from './DebtListPanel';
 import { ScheduleTable } from './ScheduleTable';
+import { AmortizationChart } from './AmortizationChart';
+import { CeilingPanel } from './CeilingPanel';
 
 export const DebtTab = () => {
   const { debts, budgetProfile } = useWallet();
@@ -44,6 +46,11 @@ export const DebtTab = () => {
       <div className="grid grid-cols-3 gap-6 mb-4">
         <BudgetProfilePanel />
         <DebtListPanel />
+      </div>
+
+      <div className="grid grid-cols-2 gap-6 mb-4">
+        <AmortizationChart projection={projection} />
+        <CeilingPanel projection={projection} budgetProfile={budgetProfile} />
       </div>
 
       <ScheduleTable projection={projection} />
