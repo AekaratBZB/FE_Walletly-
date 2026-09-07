@@ -1,5 +1,6 @@
 import React from 'react';
 import { useWallet } from '../context/WalletContext';
+import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard,
   ReceiptText,
@@ -10,7 +11,9 @@ import {
   FileSpreadsheet,
   BarChart3,
   Plus,
-  Landmark
+  Landmark,
+  LogOut,
+  User as UserIcon
 } from 'lucide-react';
 
 const TABS = [
@@ -27,12 +30,13 @@ const TABS = [
 
 export const Navbar = () => {
   const { activeTab, setActiveTab, setIsAddTxOpen } = useWallet();
+  const { user, logout } = useAuth();
 
   return (
     <header className="top-header">
       <div className="navbar">
         {/* Modern FinTech Brand Logo */}
-        <div className="brand-logo" onClick={() => setActiveTab('dashboard')} role="button" tabIndex={0} title="Walletly - กลับสู่หน้าหลัก">
+        <div className="brand-logo" onClick={() => setActiveTab('dashboard')} role="button" tabIndex={0} title="Future Wallet - กลับสู่หน้าหลัก">
           <div className="brand-icon-wrapper">
             <div className="brand-icon">
               <svg
@@ -43,55 +47,20 @@ export const Navbar = () => {
                 xmlns="http://www.w3.org/2000/svg"
                 className="brand-svg"
               >
-                <defs>
-                  <linearGradient id="brandCyan" x1="0%" y1="100%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#38bdf8" />
-                    <stop offset="100%" stopColor="#818cf8" />
-                  </linearGradient>
-                  <linearGradient id="brandLight" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#ffffff" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-
-                {/* Card / Vault Background Plate */}
-                <rect
-                  x="3.5"
-                  y="5"
-                  width="25"
-                  height="22"
-                  rx="6.5"
-                  fill="rgba(255, 255, 255, 0.14)"
-                  stroke="rgba(255, 255, 255, 0.3)"
-                  strokeWidth="1.2"
-                />
-
-                {/* Glass sheen highlight */}
-                <rect x="3.5" y="5" width="25" height="11" rx="6" fill="url(#brandLight)" />
-
-                {/* Digital Card Chip Detail */}
-                <rect x="7" y="8.5" width="4.5" height="3.5" rx="1" fill="#34d399" opacity="0.9" />
-
-                {/* Dynamic Ascending W & Growth Trend */}
                 <path
-                  d="M8 18L12 23L16 16.5L20 23L24.5 12"
-                  stroke="#ffffff"
-                  strokeWidth="2.6"
+                  d="M5 11.5L9.5 22.5L14 13.5L18.5 22.5L24.5 9"
+                  stroke="#10b981"
+                  strokeWidth="3.2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
-
-                {/* Accent Arrow Head on Top Right */}
                 <path
-                  d="M20.5 12H24.5V16"
-                  stroke="#38bdf8"
-                  strokeWidth="2.6"
+                  d="M19.5 9H24.5V14"
+                  stroke="#10b981"
+                  strokeWidth="3.2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
-
-                {/* Glowing Growth Spark */}
-                <circle cx="24.5" cy="12" r="1.8" fill="#67e8f9" />
               </svg>
             </div>
             <div className="brand-icon-glow" aria-hidden="true" />
@@ -100,7 +69,7 @@ export const Navbar = () => {
           <div className="brand-text-block">
             <div className="brand-title-wrap">
               <span className="brand-name">
-                Wallet<span className="brand-accent">ly</span>
+                Future <span className="brand-accent">Wallet</span>
               </span>
               <span className="brand-chip">
                 <span className="brand-chip-dot" />
@@ -136,8 +105,8 @@ export const Navbar = () => {
           </nav>
         </div>
 
-        {/* Quick Action Button */}
-        <div className="header-actions">
+        {/* Quick Action Button & User Profile */}
+        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <button
             className="btn btn-primary btn-sm"
             onClick={() => setIsAddTxOpen(true)}
@@ -145,6 +114,60 @@ export const Navbar = () => {
             <Plus size={16} />
             <span>บันทึกรายการ</span>
           </button>
+
+          {user && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                background: 'rgba(255, 255, 255, 0.08)',
+                padding: '0.25rem 0.55rem',
+                borderRadius: '8px',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                fontSize: '0.82rem',
+                color: 'var(--text-main)'
+              }}
+              title={`เข้าสู่ระบบโดย: ${user.email || user.name}`}
+            >
+              <div
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: 'var(--primary-light)',
+                  color: 'var(--primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 600,
+                  fontSize: '0.75rem'
+                }}
+              >
+                {user.name ? user.name.charAt(0).toUpperCase() : <UserIcon size={12} />}
+              </div>
+              <span style={{ maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user.name}
+              </span>
+              <button
+                type="button"
+                onClick={logout}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-subtle)',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '4px'
+                }}
+                title="ออกจากระบบ / สลับบัญชี"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

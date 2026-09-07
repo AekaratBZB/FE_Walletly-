@@ -1,7 +1,13 @@
 import React from 'react';
 import { useWallet } from './context/WalletContext';
+import { useAuth } from './context/AuthContext';
+import { useCookieConsent } from './context/CookieContext';
 import { Navbar } from './components/Navbar';
 import { ToastContainer } from './components/Toast';
+import { AuthView } from './features/auth/AuthView';
+import { CookieConsentBanner } from './features/cookie/CookieConsentBanner';
+import { CookiePreferencesModal } from './features/cookie/CookiePreferencesModal';
+import { PrivacyPolicyModal } from './features/cookie/PrivacyPolicyModal';
 
 // Feature Modules
 import { DashboardTab } from './features/dashboard/DashboardTab';
@@ -21,6 +27,8 @@ import { ReportsTab } from './features/reports/ReportsTab';
 
 export const App = () => {
   const { activeTab } = useWallet();
+  const { isAuthenticated } = useAuth();
+  const { setIsPreferencesOpen, setIsPolicyOpen } = useCookieConsent();
 
   const renderActiveTab = () => {
     switch (activeTab) {
@@ -47,6 +55,19 @@ export const App = () => {
     }
   };
 
+  // If not logged in, render the Auth View (Login & Register cards) + Cookie banner
+  if (!isAuthenticated) {
+    return (
+      <>
+        <AuthView />
+        <CookieConsentBanner />
+        <CookiePreferencesModal />
+        <PrivacyPolicyModal />
+        <ToastContainer />
+      </>
+    );
+  }
+
   return (
     <>
       {/* Top Navbar */}
@@ -67,10 +88,39 @@ export const App = () => {
         background: 'var(--bg-card)'
       }}>
         <div>
-          💰 <b>Walletly (FinSmart Thai)</b> - ระบบบริหารการเงินส่วนบุคคล & วางแผนภาษีครบวงจร
+          💰 <b>Future Wallet</b> - ระบบบริหารการเงินส่วนบุคคล & วางแผนภาษีครบวงจร
         </div>
-        <div style={{ marginTop: '4px' }}>
-          พัฒนาด้วย React + Vite • โครงสร้าง Feature-Based Modular Architecture
+        {/* PDPA & Cookie Links in Footer */}
+        <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.85rem', fontSize: '0.78rem' }}>
+          <button
+            type="button"
+            onClick={() => setIsPreferencesOpen(true)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-subtle)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <span>🍪</span>
+            <span>การตั้งค่าคุกกี้</span>
+          </button>
+          <span style={{ color: 'var(--border-color)' }}>•</span>
+          <button
+            type="button"
+            onClick={() => setIsPolicyOpen(true)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-subtle)',
+              cursor: 'pointer'
+            }}
+          >
+            นโยบายความเป็นส่วนตัวและคุกกี้ (PDPA)
+          </button>
         </div>
       </footer>
 
@@ -80,6 +130,11 @@ export const App = () => {
       <AddGoalModal />
       <QuickDepositModal />
       <AddDebtModal />
+
+      {/* Cookie Consent & Modals */}
+      <CookieConsentBanner />
+      <CookiePreferencesModal />
+      <PrivacyPolicyModal />
 
       {/* Toast Notifications */}
       <ToastContainer />
