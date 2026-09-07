@@ -4,6 +4,7 @@ import { simulate } from './engine/payoffSimulator';
 import { PayoffSummaryCards } from './PayoffSummaryCards';
 import { BudgetProfilePanel } from './BudgetProfilePanel';
 import { DebtListPanel } from './DebtListPanel';
+import { ScheduleTable } from './ScheduleTable';
 
 export const DebtTab = () => {
   const { debts, budgetProfile } = useWallet();
@@ -44,6 +45,8 @@ export const DebtTab = () => {
         <BudgetProfilePanel />
         <DebtListPanel />
       </div>
+
+      <ScheduleTable projection={projection} />
     </div>
   );
 };

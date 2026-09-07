@@ -700,7 +700,15 @@ export const ScheduleTable = ({ projection }) => {
           </thead>
           <tbody>
             {rows.map((m) => {
-              const principalStuck = m.LoanPayment <= m.InterestAccrued + 0.005;
+              // "Principal did not fall" is not the same as "payment did not
+              // cover this month's interest" — a payment can exceed the month's
+              // interest and still go entirely to clearing older arrears.
+              // The honest signal is whether any principal was actually repaid.
+              const principalRepaid = m.perDebt.reduce(
+                (sum, d) => sum + d.principalPortion,
+                0
+              );
+              const principalStuck = principalRepaid <= 0.005;
               const isArrearsCleared = projection.InterestArrearsClearedMonth === m.Index;
 
               return (
