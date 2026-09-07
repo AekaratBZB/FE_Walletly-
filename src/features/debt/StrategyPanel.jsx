@@ -21,16 +21,17 @@ const STRATEGY_LABEL = {
  * name whichever strategy actually wins each measure rather than assuming
  * avalanche always does.
  */
-const buildComparisonCopy = ({ interestDelta, monthsDelta }) => {
-  // interestDelta = snowball interest - avalanche interest.
-  //   > 0  => snowball costs more  => avalanche is cheaper
-  //   < 0  => snowball costs less  => snowball is cheaper
-  const cheaper = interestDelta > 0 ? 'avalanche' : interestDelta < 0 ? 'snowball' : null;
-  // monthsDelta = snowball months - avalanche months.
-  //   > 0  => snowball takes longer => avalanche is faster
-  //   < 0  => avalanche takes longer => snowball is faster
-  const faster = monthsDelta > 0 ? 'avalanche' : monthsDelta < 0 ? 'snowball' : null;
+/**
+ * Which strategy wins each measure, or null for a tie. Both deltas are
+ * snowball minus avalanche, so a positive delta means snowball is the worse of
+ * the two on that measure.
+ */
+const winnersOf = ({ interestDelta, monthsDelta }) => ({
+  cheaper: interestDelta > 0 ? 'avalanche' : interestDelta < 0 ? 'snowball' : null,
+  faster: monthsDelta > 0 ? 'avalanche' : monthsDelta < 0 ? 'snowball' : null
+});
 
+const buildComparisonCopy = ({ interestDelta, monthsDelta, cheaper, faster }) => {
   const interestAmount = formatCurrency(Math.round(Math.abs(interestDelta)));
   const monthsAmount = Math.abs(monthsDelta);
 
@@ -97,12 +98,18 @@ export const StrategyPanel = ({ debts, budgetProfile, startMonth }) => {
       { ...budgetProfile, strategy: 'snowball' },
       { startMonth }
     );
+    const deltas = {
+      interestDelta: snowball.TotalInterestPaid - avalanche.TotalInterestPaid,
+      monthsDelta: snowball.MonthsToPayoff - avalanche.MonthsToPayoff
+    };
     return {
       avalanche,
       snowball,
       bothFeasible: !avalanche.IsInfeasible && !snowball.IsInfeasible,
-      interestDelta: snowball.TotalInterestPaid - avalanche.TotalInterestPaid,
-      monthsDelta: snowball.MonthsToPayoff - avalanche.MonthsToPayoff
+      ...deltas,
+      // Derived once, so the figures' colour and the sentence below them can
+      // never disagree about who won.
+      ...winnersOf(deltas)
     };
   }, [debts, budgetProfile, startMonth]);
 
@@ -193,17 +200,31 @@ export const StrategyPanel = ({ debts, budgetProfile, startMonth }) => {
 
           {comparison.bothFeasible ? (
             <>
+              {/* Colour follows the cheaper run, not a fixed assumption that
+                  avalanche wins. It usually does — but not when the highest-rate
+                  debt is paid annually, because attack money routed to it sits
+                  in a holding pot reducing nothing while a payable debt starves.
+                  Colouring avalanche green regardless would contradict the
+                  sentence directly below these figures. */}
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <div className="text-muted">Avalanche (ดอกแพงสุดก่อน)</div>
-                  <div className="font-bold num-font text-success">
+                  <div
+                    className={`font-bold num-font ${
+                      comparison.cheaper === 'avalanche' ? 'text-success' : 'text-main'
+                    }`}
+                  >
                     {comparison.avalanche.MonthsToPayoff} เดือน ·{' '}
                     {formatCurrency(Math.round(comparison.avalanche.TotalInterestPaid))}
                   </div>
                 </div>
                 <div>
                   <div className="text-muted">Snowball (ยอดน้อยสุดก่อน)</div>
-                  <div className="font-bold num-font text-warning">
+                  <div
+                    className={`font-bold num-font ${
+                      comparison.cheaper === 'snowball' ? 'text-success' : 'text-main'
+                    }`}
+                  >
                     {comparison.snowball.MonthsToPayoff} เดือน ·{' '}
                     {formatCurrency(Math.round(comparison.snowball.TotalInterestPaid))}
                   </div>

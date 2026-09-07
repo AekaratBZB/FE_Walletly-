@@ -121,16 +121,27 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debts }) => {
                 ต่อเดือน หรือลดค่าใช้จ่ายลงให้พอ ก่อนจะเริ่มโปะหนี้ได้
               </>
             )}
-            {projection.InfeasibleReason === 'debtNotFalling' && (
-              <>
-                เงินที่เหลือไปชำระหนี้น้อยกว่าดอกเบี้ยที่เดินในแต่ละเดือน หนี้จึงไม่ลดลง
-                ต้องมีเงินเข้าชำระหนี้อย่างน้อย{' '}
-                <b className="num-font">
-                  {formatCurrency(Math.round(projection.MinimumViablePayment))}
-                </b>{' '}
-                ต่อเดือน หนี้จึงจะเริ่มลด — ลดงบกินใช้ หรือเพิ่มรายได้เสริม
-              </>
-            )}
+            {/* A 0% amortizing debt receiving nothing also stops falling, and
+                then the interest floor is genuinely zero — quoting it as the
+                amount needed would be meaningless, so name the real problem. */}
+            {projection.InfeasibleReason === 'debtNotFalling' &&
+              Math.round(projection.MinimumViablePayment) <= 0 && (
+                <>
+                  ไม่มีเงินเหลือไปถึงหนี้เลยในแต่ละเดือน ยอดหนี้จึงไม่ขยับ
+                  ต้องลดงบกินใช้ หรือเพิ่มรายได้เสริม ให้มีเงินเหลือไปชำระหนี้ก่อน
+                </>
+              )}
+            {projection.InfeasibleReason === 'debtNotFalling' &&
+              Math.round(projection.MinimumViablePayment) > 0 && (
+                <>
+                  เงินที่เหลือไปชำระหนี้น้อยกว่าดอกเบี้ยที่เดินในแต่ละเดือน หนี้จึงไม่ลดลง
+                  ต้องมีเงินเข้าชำระหนี้อย่างน้อย{' '}
+                  <b className="num-font">
+                    {formatCurrency(Math.round(projection.MinimumViablePayment))}
+                  </b>{' '}
+                  ต่อเดือน หนี้จึงจะเริ่มลด — ลดงบกินใช้ หรือเพิ่มรายได้เสริม
+                </>
+              )}
             {projection.InfeasibleReason === 'horizonExhausted' && (
               <>
                 ด้วยตัวเลขงบประมาณปัจจุบัน แผนนี้ยังปิดหนี้ไม่จบภายใน 50 ปีที่ระบบคำนวณให้

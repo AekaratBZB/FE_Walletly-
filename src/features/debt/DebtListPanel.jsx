@@ -55,7 +55,12 @@ const DebtRow = ({ debt, onEdit, onDelete }) => {
             ปิดตอนนี้แพงกว่าผ่อนต่อ
           </div>
         )}
-        {debt.type === 'hirePurchase' && rebate !== null && rebate >= 0 && (
+        {debt.type === 'hirePurchase' && rebate !== null && rebate === 0 && (
+          <div className="text-xs text-muted mt-1">
+            ยอดปิดบัญชีเท่ากับค่างวดที่เหลือพอดี — ปิดตอนนี้ไม่ประหยัดและไม่แพงขึ้น
+          </div>
+        )}
+        {debt.type === 'hirePurchase' && rebate !== null && rebate > 0 && (
           <div className="text-xs text-muted mt-1 num-font">
             ปิดบัญชีวันนี้ประหยัด {formatCurrency(Math.round(rebate))}
             {decay !== null && decay > 0 && (
