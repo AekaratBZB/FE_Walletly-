@@ -161,6 +161,7 @@ import {
   BarElement,
   PointElement,
   LineElement,
+  LineController,
   Tooltip,
   Legend
 } from 'chart.js';
@@ -174,6 +175,7 @@ ChartJS.register(
   BarElement,
   PointElement,
   LineElement,
+  LineController,
   Tooltip,
   Legend
 );
@@ -190,6 +192,7 @@ export const CeilingPanel = ({ projection, budgetProfile }) => {
   const budget = Number(budgetProfile.discretionaryBudget) || 0;
   const first = shown[0];
   const breathingRoom = first.DiscretionaryCeiling - budget;
+  const roundedBreathingRoom = Math.round(breathingRoom);
 
   const data = {
     labels: shown.map((m) => formatMonthLabel(m.Month)),
@@ -260,14 +263,14 @@ export const CeilingPanel = ({ projection, budgetProfile }) => {
         <div className="text-xs text-muted">ช่องว่างหายใจเดือนนี้ (Breathing Room)</div>
         <div
           className={`font-bold text-lg num-font ${
-            breathingRoom >= 0 ? 'text-success' : 'text-danger'
+            roundedBreathingRoom >= 0 ? 'text-success' : 'text-danger'
           }`}
         >
-          {breathingRoom >= 0 ? '+' : '-'}
-          {formatCurrency(Math.abs(Math.round(breathingRoom)))}
+          {roundedBreathingRoom >= 0 ? '+' : '-'}
+          {formatCurrency(Math.abs(roundedBreathingRoom))}
         </div>
         <div className="text-xs text-subtle">
-          {breathingRoom >= 0
+          {roundedBreathingRoom >= 0
             ? 'ยังใช้จ่ายได้ต่ำกว่าเพดาน หนี้เดือนนี้จึงลดลง'
             : 'ใช้จ่ายเกินเพดาน หนี้เดือนนี้จะโตขึ้น ไม่ลด'}
         </div>
