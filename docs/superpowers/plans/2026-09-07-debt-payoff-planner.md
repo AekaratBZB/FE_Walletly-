@@ -44,9 +44,10 @@
 |---|---|
 | `src/features/debt/engine/__tests__/goldenFixture.js` | The §8 fixture as data |
 | `src/features/debt/engine/__tests__/debtMath.test.js` | Unit tests for the math helpers |
-| `src/features/debt/engine/__tests__/payoffSimulator.golden.test.js` | The 14 §8 assertions + both sensitivity tables |
+| `src/features/debt/engine/__tests__/payoffSimulator.golden.test.js` | The 13 §8 assertions + both sensitivity tables |
 | `src/features/debt/engine/__tests__/payoffSimulator.edge.test.js` | 9 edge cases (5 from §8, 4 for multi-loan) |
-| `src/features/debt/engine/__tests__/strategyRanker.test.js` | Ranking and quote-missing behaviour |
+| `src/features/debt/engine/__tests__/payoffSimulator.cascade.test.js` | The money-conservation invariant + the step 7 cascade / pot-cap / infeasibility regressions + the `manual` strategy |
+| `src/features/debt/engine/__tests__/strategyRanker.test.js` | Ranking, quote-missing behaviour, and the unreliable-projection flag |
 
 **State:**
 
@@ -101,7 +102,9 @@
   - `periodsRemaining(debt) => number`
   - `outstandingBalance(debt) => number`
   - `resolveSchedule(defaultValue: number, overrides: {fromMonth,amount}[], month: number) => number`
-  - `hasFutureOverride(overrides, month: number) => boolean`
+  - `hasFutureOverride(overrides, month: number, withinMonths = 12) => boolean`
+    — bounded look-ahead: a stale override far beyond the window is not
+    evidence that a stalled plan is about to recover
   - `monthlyInterest(loan: {principal, annualRatePct}) => number`
   - `minimumDue(loan) => number`
   - `hirePurchaseRebate(debt) => number | null`
@@ -219,7 +222,9 @@ Create `src/features/debt/engine/types.js`:
  * @property {number|null} InterestArrearsClearedMonth
  * @property {number} MonthlyInterestThreshold
  * @property {boolean} IsInfeasible
+ * @property {'budgetShortfall'|'debtNotFalling'|'horizonExhausted'|null} InfeasibleReason
  * @property {number|null} MinimumViablePayment
+ * @property {number|null} MonthlyShortfall
  */
 
 export {};
@@ -481,9 +486,22 @@ export const resolveSchedule = (defaultValue, overrides, month) => {
   return value;
 };
 
-/** True when some override has not taken effect yet, i.e. more cash may free up. */
-export const hasFutureOverride = (overrides, month) =>
-  (overrides || []).some((o) => Number(o.fromMonth) > month);
+/** How far ahead an override still counts as "cash on its way". */
+export const OVERRIDE_LOOKAHEAD_MONTHS = 12;
+
+/**
+ * True when some override has not taken effect yet, i.e. more cash may free up.
+ *
+ * Bounded to the next `withinMonths` months. An unbounded test lets a single
+ * stale override at, say, month 400 keep the non-termination guard switched
+ * off for 400 months, so a portfolio whose debt is visibly growing grinds all
+ * the way to maxMonths instead of reporting infeasibility.
+ */
+export const hasFutureOverride = (overrides, month, withinMonths = OVERRIDE_LOOKAHEAD_MONTHS) =>
+  (overrides || []).some((o) => {
+    const from = Number(o.fromMonth);
+    return Number.isFinite(from) && from > month && from - month <= withinMonths;
+  });
 
 /** One month of interest on the outstanding principal. */
 export const monthlyInterest = (loan) =>
@@ -883,7 +901,9 @@ export const simulate = (debts, budget, options = {}) => {
   let interestArrearsClearedMonth = null;
   const startedWithArrears = loans.some((l) => l.accruedInterest > EPS);
   let isInfeasible = false;
+  let infeasibleReason = null;
   let minimumViablePayment = null;
+  let monthlyShortfall = null;
   let prevTotalDebt = loans.reduce((s, l) => s + balanceOf(l), 0);
 
   for (let month = 0; month < maxMonths; month++) {
@@ -910,7 +930,13 @@ export const simulate = (debts, budget, options = {}) => {
         accrued += i;
       }
       isInfeasible = true;
+      infeasibleReason = 'budgetShortfall';
       minimumViablePayment = openLoans.reduce((s, l) => s + monthlyInterest(l), 0);
+      // The binding constraint here is NOT interest — the fixed obligations
+      // alone outrun the income, and with no interest-bearing debt at all
+      // minimumViablePayment is a meaningless 0. MonthlyShortfall is the
+      // honest figure for this failure mode.
+      monthlyShortfall = -surplus;
       months.push({
         Index: month,
         Month: addMonths(startMonth, month),
@@ -992,21 +1018,43 @@ export const simulate = (debts, budget, options = {}) => {
       record(loan, r);
     }
 
-    // Everything left attacks one debt.
-    if (availableForLoan > 0) {
-      const target = pickTarget(openLoans, budget);
-      if (target) {
-        if (!target.acceptsEarlyPayment) {
-          target.holdingPot += availableForLoan;
-          heldThisMonth += availableForLoan;
-          availableForLoan = 0;
-        } else {
-          const r = pay(target, availableForLoan);
-          availableForLoan -= r.paid;
-          loanPayment += r.paid;
-          interestPaidThisMonth += r.interestPortion;
-          record(target, r);
-        }
+    // Everything left attacks debts in strategy order, CASCADING: the target
+    // takes what it can absorb and the remainder falls through to the next
+    // candidate. A single non-looping pay() here destroys up to a full month's
+    // surplus in every month a debt closes, because pay() caps at the balance
+    // and nothing else ever spends the difference.
+    //
+    // `attackable` is the candidate pool for this month's cascade. Each pass
+    // either exhausts availableForLoan or fills its target to capacity, so the
+    // target is dropped unconditionally: the loop can run at most once per
+    // open loan and cannot spin. (pickTarget's own balance > EPS filter drops a
+    // paid-off loan too, but a holding-pot loan's balance does not fall when
+    // its pot is topped up, so the explicit drop is what guarantees progress.)
+    const attackable = openLoans.slice();
+    while (availableForLoan > EPS) {
+      const target = pickTarget(attackable, budget);
+      if (!target) break;
+      attackable.splice(attackable.indexOf(target), 1);
+
+      if (!target.acceptsEarlyPayment) {
+        // NEVER pool more than the loan can owe. The pot is money already
+        // committed to this loan, so its unpooled obligation is
+        // balance - holdingPot. Without the cap the pot pools a whole surplus
+        // a month against a debt that cannot absorb it, the annual release
+        // caps at the balance, and the excess is deleted.
+        const room = Math.max(0, balanceOf(target) - target.holdingPot);
+        const add = Math.min(availableForLoan, room);
+        if (add <= 0) continue;
+        target.holdingPot += add;
+        heldThisMonth += add;
+        availableForLoan -= add;
+      } else {
+        const r = pay(target, availableForLoan);
+        if (r.paid <= 0) continue;
+        availableForLoan -= r.paid;
+        loanPayment += r.paid;
+        interestPaidThisMonth += r.interestPortion;
+        record(target, r);
       }
     }
 
@@ -1025,13 +1073,22 @@ export const simulate = (debts, budget, options = {}) => {
 
     totalInterestPaid += interestPaidThisMonth;
 
+    let closedThisMonth = false;
     for (const loan of openLoans) {
       if (loan.principal <= EPS && loan.accruedInterest <= EPS) {
         loan.isClosed = true;
+        closedThisMonth = true;
         // The debt is gone — any cash still sitting in its pot is no longer
         // earmarked for it and must not be treated as an outstanding
         // obligation (see the non-termination guard's holdingPot check).
+        //
+        // Assigning 0 here would DELETE that cash. The pot cap in the attack
+        // step means a residue should never arise, but if one ever does the
+        // money belongs back in the month's budget, not in the bin — so hand
+        // it back to availableForLoan and keep the books balanced.
+        const potResidue = loan.holdingPot;
         loan.holdingPot = 0;
+        availableForLoan += potResidue;
       }
     }
 
@@ -1093,8 +1150,14 @@ export const simulate = (debts, budget, options = {}) => {
         stillOpen.every((l) => l.holdingPot <= EPS);
 
       const totalDebt = stillOpen.reduce((s, l) => s + balanceOf(l), 0);
-      if (noMoreCashComing && totalDebt >= prevTotalDebt) {
+      // A loan CLOSING this month is itself proof the plan is progressing, so
+      // the guard must never fire on such a month. Without this, a month whose
+      // attack money finishes off one debt can look flat on the remaining
+      // ones and report a false IsInfeasible on a portfolio that in fact pays
+      // off comfortably.
+      if (noMoreCashComing && !closedThisMonth && totalDebt >= prevTotalDebt) {
         isInfeasible = true;
+        infeasibleReason = 'debtNotFalling';
         minimumViablePayment = stillOpen.reduce((s, l) => s + monthlyInterest(l), 0);
         break;
       }
@@ -1105,6 +1168,7 @@ export const simulate = (debts, budget, options = {}) => {
   // Ran out of horizon with debt still open.
   if (!isInfeasible && loans.some((l) => !l.isClosed) && months.length >= maxMonths) {
     isInfeasible = true;
+    infeasibleReason = 'horizonExhausted';
     minimumViablePayment = loans
       .filter((l) => !l.isClosed)
       .reduce((s, l) => s + monthlyInterest(l), 0);
@@ -1118,7 +1182,18 @@ export const simulate = (debts, budget, options = {}) => {
     InterestArrearsClearedMonth: interestArrearsClearedMonth,
     MonthlyInterestThreshold: monthlyInterestThreshold,
     IsInfeasible: isInfeasible,
-    MinimumViablePayment: isInfeasible ? minimumViablePayment : null
+    // Which failure mode ended the run: 'budgetShortfall' (surplus < 0),
+    // 'debtNotFalling' (the non-termination guard) or 'horizonExhausted'
+    // (maxMonths reached). null on a feasible run.
+    InfeasibleReason: isInfeasible ? infeasibleReason : null,
+    // The monthly interest floor: the amount that must reach the loans each
+    // month before balances start falling. Meaningful for 'debtNotFalling'
+    // and 'horizonExhausted'. For 'budgetShortfall' the interest is NOT the
+    // binding constraint — read MonthlyShortfall instead.
+    MinimumViablePayment: isInfeasible ? minimumViablePayment : null,
+    // How much the failing month is short by, i.e. the magnitude of the
+    // negative surplus. Non-null only for 'budgetShortfall'.
+    MonthlyShortfall: isInfeasible ? monthlyShortfall : null
   };
 };
 ```
@@ -1149,10 +1224,36 @@ git commit -m "feat: add payoff simulator passing all golden vectors"
 **Files:**
 - Modify: `src/features/debt/engine/payoffSimulator.js` (only if a test demands it)
 - Test: `src/features/debt/engine/__tests__/payoffSimulator.edge.test.js`
+- Test: `src/features/debt/engine/__tests__/payoffSimulator.cascade.test.js`
 
 **Interfaces:**
 - Consumes: `simulate` (Task 2), `GOLDEN_BUDGET` / `GOLDEN_DEBTS` / `GOLDEN_START` (Task 2)
 - Produces: nothing new — this task proves the engine's behaviour outside the single-loan path
+
+**The money-conservation invariant is the load-bearing test here.** The nine
+§8-derived edge cases all happen to use portfolios where the attack target can
+absorb the whole surplus, so none of them notices cash being destroyed.
+`payoffSimulator.cascade.test.js` asserts, for every month of five different
+portfolios, that
+
+```
+sum(perDebt[].paid) + Σ(held_now - held_prev)  ==  availableForLoan
+```
+
+within `EPS`, with `availableForLoan` re-derived from the row's own `Surplus`,
+`EmergencyContribution` and the buffer resolved for that month rather than from
+the loop. The equality is asserted whenever any debt could still absorb another
+baht — capacity is `balance - held`, because a pot is money already committed
+to that loan — and relaxed to `<=` only when every debt is full.
+
+The same file pins the step 7 regressions: the cascade (two loans at 5% and
+25%, 25,000/month, `avalanche` — 9 months and 8,384.17 interest, with month 4
+splitting 5,541.86 / 19,458.14), the pot cap (50,000 at 20% due in June plus a
+500,000 mortgage at 5% — 24 months and 35,803.51 interest, no pot ever above
+its loan's balance), no false infeasibility when a loan closes, the
+`budgetShortfall` reason and `MonthlyShortfall` figure, the bounded override
+look-ahead, and the `manual` strategy (explicit order, empty order, missing
+order).
 
 - [ ] **Step 1: Write the failing edge-case tests**
 
@@ -1458,6 +1559,7 @@ assertion.
 Only if a test fails. Likely spots, in order of probability:
 
 1. Edge 3 month index for June. Month 0 is October 2026, so June 2027 is index 8. If `HeldForAnnualPayment` is 0 at month 0, the holding-pot branch in step 7 is not being reached — check that `acceptsEarlyPayment: false` survives `makeWorkingLoan`.
+1b. Money-conservation failures. If the invariant reports an outflow *below* `availableForLoan` while a debt still has capacity, step 7 is not cascading — `pay()` capped at the target's balance and the remainder was never spent. If a holding pot exceeds its loan's balance, the `balance - holdingPot` cap is missing. Neither is fixable by relaxing the assertion.
 2. Edge 8 floor behaviour. If a payment of 0 appears while a balance remains, `minimumDue` is clamping to the balance too early — the clamp must be the last operation.
 3. Edge 9 ordering. If `LoanPayment` exceeds `surplus`, the `availableForLoan -= r.paid` line is missing or misplaced in the minimums loop.
 
@@ -1467,7 +1569,7 @@ Only if a test fails. Likely spots, in order of probability:
 npm test
 ```
 
-Expected: PASS — golden suite plus all nine edge cases green. **This is the gate.**
+Expected: PASS — golden suite, all nine edge cases and the cascade suite green. **This is the gate.**
 
 - [ ] **Step 5: Commit**
 
@@ -1488,8 +1590,16 @@ git commit -m "test: cover multi-loan strategies, holding pot and infeasible inp
 - Consumes: `simulate` (Task 2), `hirePurchaseRebate` / `rebateDecayPerMonth` (Task 1)
 - Produces:
   - `rankDebts(debts, budget, options?) => RankedDebt[]` where
-    `RankedDebt = { debtId, name, type, totalRemainingCost, quoteMissing, rebateDecayPerMonth, reason }`,
-    sorted descending by `totalRemainingCost`
+    `RankedDebt = { debtId, name, type, totalRemainingCost, quoteMissing, rebateDecayPerMonth, rankingUnreliable, reason }`,
+    sorted descending by `totalRemainingCost`.
+
+    When `simulate` returns `IsInfeasible: true` its rows are truncated and no
+    honest amortizing interest can be summed from them, so every row carries
+    `rankingUnreliable: true`, amortizing rows report
+    `totalRemainingCost: null` (never a fabricated estimate) and are pinned
+    above the non-amortizing rows ordered by descending `annualRatePct` then
+    descending balance. On a feasible run `rankingUnreliable` is `false`
+    everywhere and nothing else changes.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1576,7 +1686,7 @@ Expected: FAIL — `Failed to resolve import "../strategyRanker"`.
 Create `src/features/debt/engine/strategyRanker.js`:
 
 ```js
-import { hirePurchaseRebate, rebateDecayPerMonth } from './debtMath';
+import { hirePurchaseRebate, outstandingBalance, rebateDecayPerMonth } from './debtMath';
 import { simulate } from './payoffSimulator';
 
 const baht = (n) => Math.round(n).toLocaleString('th-TH');
@@ -1588,12 +1698,21 @@ const baht = (n) => Math.round(n).toLocaleString('th-TH');
  * The amortizing figure comes from a real projection rather than a closed-form
  * approximation, so it accounts for the freed cash as installment plans expire.
  *
+ * When the projection is infeasible its rows are truncated, so the interest an
+ * amortizing debt will actually pay is unknowable from it — summing the rows
+ * collapses `totalRemainingCost` toward zero and can rank a real interest-
+ * bearing loan below a hire-purchase rebate, inverting the action plan. In that
+ * case every row carries `rankingUnreliable: true`, the amortizing rows report
+ * `totalRemainingCost: null` rather than a fabricated estimate, and they are
+ * pinned above the non-amortizing rows ordered by rate then balance.
+ *
  * @param {import('./types').Debt[]} debts
  * @param {import('./types').BudgetProfile} budget
  * @param {{ maxMonths?: number, startMonth?: import('./types').YearMonth }} [options]
  */
 export const rankDebts = (debts, budget, options = {}) => {
   const projection = simulate(debts, budget, options);
+  const unreliable = projection.IsInfeasible === true;
 
   const interestByDebt = new Map();
   for (const row of projection.Months) {
@@ -1613,6 +1732,7 @@ export const rankDebts = (debts, budget, options = {}) => {
           totalRemainingCost: 0,
           quoteMissing: false,
           rebateDecayPerMonth: null,
+          rankingUnreliable: unreliable,
           reason:
             'ผ่อน 0% — ต้นทุนการถือหนี้ก้อนนี้เป็นศูนย์ ยอดใหญ่แค่ไหนก็โปะก่อนกำหนดไม่ประหยัด'
         };
@@ -1628,6 +1748,7 @@ export const rankDebts = (debts, budget, options = {}) => {
             totalRemainingCost: 0,
             quoteMissing: true,
             rebateDecayPerMonth: null,
+            rankingUnreliable: unreliable,
             reason:
               'ยังไม่มีใบเสนอปิดบัญชี — ขอใบเสนอปิดบัญชีจากเจ้าหนี้ก่อน จึงจะรู้ส่วนลดที่ได้จริง'
           };
@@ -1640,7 +1761,22 @@ export const rankDebts = (debts, budget, options = {}) => {
           totalRemainingCost: rebate,
           quoteMissing: false,
           rebateDecayPerMonth: decay,
+          rankingUnreliable: unreliable,
           reason: `ปิดบัญชีวันนี้ประหยัดได้ ${baht(rebate)} บาท และส่วนลดหดลงราวเดือนละ ${baht(decay)} บาท`
+        };
+      }
+
+      if (unreliable) {
+        // No honest interest figure exists: the projection stopped early.
+        return {
+          debtId: d.id,
+          name: d.name,
+          type: d.type,
+          totalRemainingCost: null,
+          quoteMissing: false,
+          rebateDecayPerMonth: null,
+          rankingUnreliable: true,
+          reason: `ดอกเบี้ย ${d.annualRatePct}% ต่อปี — แผนปัจจุบันยังปิดหนี้ไม่ได้ จึงยังคำนวณดอกเบี้ยรวมไม่ได้ ต้องแก้งบประมาณก่อน`
         };
       }
 
@@ -1651,9 +1787,34 @@ export const rankDebts = (debts, budget, options = {}) => {
         totalRemainingCost: interestByDebt.get(d.id) || 0,
         quoteMissing: false,
         rebateDecayPerMonth: null,
+        rankingUnreliable: false,
         reason: `ดอกเบี้ย ${d.annualRatePct}% ต่อปี — โปะก้อนนี้ลดดอกเบี้ยได้ทันทีในงวดถัดไป`
       };
     });
+
+  if (unreliable) {
+    // Rows whose cost is unknown-but-real go first, ordered by facts about the
+    // debt rather than by the truncated projection.
+    const rateOf = (r) => {
+      const d = (debts || []).find((x) => x.id === r.debtId) || {};
+      return Number(d.annualRatePct) || 0;
+    };
+    const balanceOfRow = (r) => {
+      const d = (debts || []).find((x) => x.id === r.debtId);
+      return d ? outstandingBalance(d) : 0;
+    };
+    ranked.sort((a, b) => {
+      const au = a.totalRemainingCost === null;
+      const bu = b.totalRemainingCost === null;
+      if (au !== bu) return au ? -1 : 1;
+      if (au) {
+        if (rateOf(b) !== rateOf(a)) return rateOf(b) - rateOf(a);
+        return balanceOfRow(b) - balanceOfRow(a);
+      }
+      return b.totalRemainingCost - a.totalRemainingCost;
+    });
+    return ranked;
+  }
 
   ranked.sort((a, b) => b.totalRemainingCost - a.totalRemainingCost);
   return ranked;

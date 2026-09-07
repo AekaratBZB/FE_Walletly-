@@ -82,7 +82,19 @@
  * @property {number|null} InterestArrearsClearedMonth
  * @property {number} MonthlyInterestThreshold
  * @property {boolean} IsInfeasible
+ * @property {'budgetShortfall'|'debtNotFalling'|'horizonExhausted'|null} InfeasibleReason
  * @property {number|null} MinimumViablePayment
+ * @property {number|null} MonthlyShortfall
+ *
+ * @typedef {Object} RankedDebt
+ * @property {string} debtId
+ * @property {string} name
+ * @property {DebtType} type
+ * @property {number|null} totalRemainingCost  null => not computable, see rankingUnreliable
+ * @property {boolean} quoteMissing
+ * @property {number|null} rebateDecayPerMonth
+ * @property {boolean} rankingUnreliable  true on every row when the projection is infeasible
+ * @property {string} reason
  */
 
 export {};

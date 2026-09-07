@@ -62,4 +62,50 @@ describe('rankDebts', () => {
   it('handles an empty debt list', () => {
     expect(rankDebts([], GOLDEN_BUDGET, opts)).toEqual([]);
   });
+
+  it('marks the ranking reliable on a feasible projection', () => {
+    for (const r of ranked) {
+      expect(r.rankingUnreliable).toBe(false);
+    }
+  });
+});
+
+describe('rankDebts on an infeasible projection', () => {
+  // discretionaryBudget 25,000 drives the surplus negative, so the projection
+  // stops after one row and no amortizing interest can be summed from it.
+  const infeasibleBudget = { ...GOLDEN_BUDGET, discretionaryBudget: 25000 };
+  const withQuote = GOLDEN_DEBTS.map((d) =>
+    d.id === 'hp-car' ? { ...d, settlementQuote: 41000 } : d
+  );
+  const ranked = rankDebts(withQuote, infeasibleBudget, opts);
+  const byId = (id) => ranked.find((r) => r.debtId === id);
+
+  it('flags every row as unreliable', () => {
+    for (const r of ranked) {
+      expect(r.rankingUnreliable).toBe(true);
+    }
+  });
+
+  it('refuses to invent an interest figure for the amortizing loan', () => {
+    expect(byId('loan-1').totalRemainingCost).toBeNull();
+    expect(byId('loan-1').reason).toContain('ยังคำนวณดอกเบี้ยรวมไม่ได้');
+  });
+
+  it('keeps the interest-bearing loan above the hire-purchase rebate', () => {
+    // The truncated projection would have costed the loan at 0, ranking it
+    // below the car's 6,236 rebate and inverting the action plan.
+    expect(ranked[0].debtId).toBe('loan-1');
+    expect(byId('hp-car').totalRemainingCost).toBeCloseTo(6236, 2);
+    const carIndex = ranked.findIndex((r) => r.debtId === 'hp-car');
+    expect(carIndex).toBeGreaterThan(0);
+  });
+
+  it('leaves the projection-independent rows descending below it', () => {
+    const rest = ranked.filter((r) => r.totalRemainingCost !== null);
+    for (let i = 1; i < rest.length; i++) {
+      expect(rest[i - 1].totalRemainingCost).toBeGreaterThanOrEqual(
+        rest[i].totalRemainingCost
+      );
+    }
+  });
 });

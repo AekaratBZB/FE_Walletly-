@@ -148,7 +148,9 @@ export const simulate = (debts, budget, options = {}) => {
   let interestArrearsClearedMonth = null;
   const startedWithArrears = loans.some((l) => l.accruedInterest > EPS);
   let isInfeasible = false;
+  let infeasibleReason = null;
   let minimumViablePayment = null;
+  let monthlyShortfall = null;
   let prevTotalDebt = loans.reduce((s, l) => s + balanceOf(l), 0);
 
   for (let month = 0; month < maxMonths; month++) {
@@ -175,7 +177,14 @@ export const simulate = (debts, budget, options = {}) => {
         accrued += i;
       }
       isInfeasible = true;
+      infeasibleReason = 'budgetShortfall';
       minimumViablePayment = openLoans.reduce((s, l) => s + monthlyInterest(l), 0);
+      // The binding constraint here is NOT interest — the fixed obligations
+      // alone outrun the income, and with no interest-bearing debt at all
+      // minimumViablePayment is a meaningless 0. MonthlyShortfall is the
+      // honest figure for this failure mode: how much more cash the month
+      // needs before a single baht can reach any debt.
+      monthlyShortfall = -surplus;
       months.push(
         buildMonthRow({
           index: month,
@@ -259,21 +268,43 @@ export const simulate = (debts, budget, options = {}) => {
       record(loan, r);
     }
 
-    // Everything left attacks one debt.
-    if (availableForLoan > 0) {
-      const target = pickTarget(openLoans, budget);
-      if (target) {
-        if (!target.acceptsEarlyPayment) {
-          target.holdingPot += availableForLoan;
-          heldThisMonth += availableForLoan;
-          availableForLoan = 0;
-        } else {
-          const r = pay(target, availableForLoan);
-          availableForLoan -= r.paid;
-          loanPayment += r.paid;
-          interestPaidThisMonth += r.interestPortion;
-          record(target, r);
-        }
+    // Everything left attacks debts in strategy order, CASCADING: the target
+    // takes what it can absorb and the remainder falls through to the next
+    // candidate. A single non-looping pay() here destroys up to a full month's
+    // surplus in every month a debt closes, because pay() caps at the balance
+    // and nothing else ever spends the difference.
+    //
+    // `attackable` is the candidate pool for this month's cascade. Each pass
+    // either exhausts availableForLoan or fills its target to capacity, so the
+    // target is dropped unconditionally: the loop can run at most once per
+    // open loan and cannot spin. (pickTarget's own balance > EPS filter drops a
+    // paid-off loan too, but a holding-pot loan's balance does not fall when
+    // its pot is topped up, so the explicit drop is what guarantees progress.)
+    const attackable = openLoans.slice();
+    while (availableForLoan > EPS) {
+      const target = pickTarget(attackable, budget);
+      if (!target) break;
+      attackable.splice(attackable.indexOf(target), 1);
+
+      if (!target.acceptsEarlyPayment) {
+        // NEVER pool more than the loan can owe. The pot is money already
+        // committed to this loan, so its unpooled obligation is
+        // balance - holdingPot. Without the cap the pot pools a whole surplus
+        // a month against a debt that cannot absorb it, the annual release
+        // caps at the balance, and the excess is deleted.
+        const room = Math.max(0, balanceOf(target) - target.holdingPot);
+        const add = Math.min(availableForLoan, room);
+        if (add <= 0) continue;
+        target.holdingPot += add;
+        heldThisMonth += add;
+        availableForLoan -= add;
+      } else {
+        const r = pay(target, availableForLoan);
+        if (r.paid <= 0) continue;
+        availableForLoan -= r.paid;
+        loanPayment += r.paid;
+        interestPaidThisMonth += r.interestPortion;
+        record(target, r);
       }
     }
 
@@ -292,13 +323,22 @@ export const simulate = (debts, budget, options = {}) => {
 
     totalInterestPaid += interestPaidThisMonth;
 
+    let closedThisMonth = false;
     for (const loan of openLoans) {
       if (loan.principal <= EPS && loan.accruedInterest <= EPS) {
         loan.isClosed = true;
+        closedThisMonth = true;
         // The debt is gone — any cash still sitting in its pot is no longer
         // earmarked for it and must not be treated as an outstanding
         // obligation (see the non-termination guard's holdingPot check).
+        //
+        // Assigning 0 here would DELETE that cash. The pot cap in the attack
+        // step means a residue should never arise, but if one ever does the
+        // money belongs back in the month's budget, not in the bin — so hand
+        // it back to availableForLoan and keep the books balanced.
+        const potResidue = loan.holdingPot;
         loan.holdingPot = 0;
+        availableForLoan += potResidue;
       }
     }
 
@@ -362,8 +402,14 @@ export const simulate = (debts, budget, options = {}) => {
         stillOpen.every((l) => l.holdingPot <= EPS);
 
       const totalDebt = stillOpen.reduce((s, l) => s + balanceOf(l), 0);
-      if (noMoreCashComing && totalDebt >= prevTotalDebt) {
+      // A loan CLOSING this month is itself proof the plan is progressing, so
+      // the guard must never fire on such a month. Without this, a month whose
+      // attack money finishes off one debt can look flat on the remaining
+      // ones and report a false IsInfeasible on a portfolio that in fact pays
+      // off comfortably.
+      if (noMoreCashComing && !closedThisMonth && totalDebt >= prevTotalDebt) {
         isInfeasible = true;
+        infeasibleReason = 'debtNotFalling';
         minimumViablePayment = stillOpen.reduce((s, l) => s + monthlyInterest(l), 0);
         break;
       }
@@ -374,6 +420,7 @@ export const simulate = (debts, budget, options = {}) => {
   // Ran out of horizon with debt still open.
   if (!isInfeasible && loans.some((l) => !l.isClosed) && months.length >= maxMonths) {
     isInfeasible = true;
+    infeasibleReason = 'horizonExhausted';
     minimumViablePayment = loans
       .filter((l) => !l.isClosed)
       .reduce((s, l) => s + monthlyInterest(l), 0);
@@ -387,6 +434,17 @@ export const simulate = (debts, budget, options = {}) => {
     InterestArrearsClearedMonth: interestArrearsClearedMonth,
     MonthlyInterestThreshold: monthlyInterestThreshold,
     IsInfeasible: isInfeasible,
-    MinimumViablePayment: isInfeasible ? minimumViablePayment : null
+    // Which failure mode ended the run: 'budgetShortfall' (surplus < 0),
+    // 'debtNotFalling' (the non-termination guard) or 'horizonExhausted'
+    // (maxMonths reached). null on a feasible run.
+    InfeasibleReason: isInfeasible ? infeasibleReason : null,
+    // The monthly interest floor: the amount that must reach the loans each
+    // month before balances start falling. Meaningful for 'debtNotFalling'
+    // and 'horizonExhausted'. For 'budgetShortfall' the interest is NOT the
+    // binding constraint — read MonthlyShortfall instead.
+    MinimumViablePayment: isInfeasible ? minimumViablePayment : null,
+    // How much the failing month is short by, i.e. the magnitude of the
+    // negative surplus. Non-null only for 'budgetShortfall'.
+    MonthlyShortfall: isInfeasible ? monthlyShortfall : null
   };
 };

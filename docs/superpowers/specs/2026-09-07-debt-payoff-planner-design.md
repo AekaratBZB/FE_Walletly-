@@ -256,15 +256,46 @@ for month = 0 .. maxMonths-1:
                   pay(loan, paid)
                   availableForLoan -= paid
 
-  step 7  ATTACK with what is left, one debt only:
-              target = per budget.strategy:
-                  'avalanche' -> highest annualRatePct
-                                 (tie broken by smaller balance)
-                  'snowball'  -> smallest (principal + accruedInterest)
-                  'manual'    -> first still-open id in manualOrder
-              pay(target, availableForLoan)
+  step 7  ATTACK with what is left, CASCADING through the strategy order:
+              attackable = open loans
+              while availableForLoan > EPS:
+                  target = pickTarget(attackable) per budget.strategy:
+                      'avalanche' -> highest annualRatePct
+                                     (tie broken by smaller balance)
+                      'snowball'  -> smallest (principal + accruedInterest)
+                      'manual'    -> first still-open id in manualOrder,
+                                     else the first open loan
+                      (candidates are loans with balance > EPS; null stops
+                       the cascade)
+                  if target is null: break
+                  drop target from attackable
+                  if target.acceptsEarlyPayment is false:
+                      room = max(0, balance(target) - target.holdingPot)
+                      add  = min(availableForLoan, room)
+                      target.holdingPot += add;  availableForLoan -= add
+                  else:
+                      paid = pay(target, availableForLoan)
+                      availableForLoan -= paid
 
-  step 8  close any loan with principal <= 0 and accruedInterest <= 0
+          The loop is what makes the step correct. `pay()` caps at the target's
+          balance, so a single non-looping `pay(target, availableForLoan)`
+          leaves the remainder in `availableForLoan` and nothing ever spends
+          it — up to a full month's surplus is destroyed in every month a debt
+          closes, which both understates the payoff speed and can make the
+          non-termination guard fire on a feasible plan.
+
+          Termination: each pass either exhausts `availableForLoan` or fills
+          its target to capacity, so the target is dropped unconditionally and
+          the loop runs at most once per open loan. Dropping is not optional
+          for the holding-pot branch — topping up a pot does not reduce the
+          loan's balance, so `pickTarget` would keep returning it forever.
+
+          The cascade stops with money unspent only when no open debt can
+          absorb another baht. That is correct, not a leak.
+
+  step 8  close any loan with principal <= 0 and accruedInterest <= 0;
+          hand any pot residue on a closing loan BACK to availableForLoan
+          rather than assigning 0 (assigning 0 deletes real cash)
           append MonthlyProjection row
           if interestBearing all closed: break
           check the non-termination guard
@@ -304,7 +335,8 @@ requires `annualDueMonth` to be set. Such a debt **receives no payment in steps
 - its minimum payment is forced to 0 in step 6 regardless of
   `minimumPayment.mode` — an annually-due loan has no monthly obligation
 - if it is selected as the step 7 target, the money is added to
-  `holdingPot[loanId]` rather than paid
+  `holdingPot[loanId]` rather than paid — **capped at what the loan can still
+  owe**, i.e. `balance - holdingPot` (see below)
 - in the calendar month matching `annualDueMonth`, the whole pot is paid via
   `pay(loan, holdingPot[loanId])` and the pot resets to 0
 - **interest still accrues every month in step 5**
@@ -314,6 +346,24 @@ annually-due loan should still attract the attack money, it just pools until
 the due month. Holding cash while interest accrues is strictly worse than
 paying monthly, so this path must produce a later payoff and higher total
 interest than the monthly path — asserted as a direction, not a number.
+
+**The pot is capped, and the excess cascades.** The pot is money already
+committed to that loan, so the loan's *unpooled* remaining obligation is
+`balance - holdingPot`, and that is the ceiling on what step 7 may add in a
+month. Without the cap an uncapped pot pools an entire surplus a month against
+a debt that cannot absorb it: `pay()` caps the annual release at the balance
+and the excess is silently deleted, while every other debt in the portfolio
+receives nothing for months. Once a pot is full the loan is dropped from
+`attackable` and the remainder falls through to the next candidate in the same
+step 7 loop.
+
+Worked example — a 50,000 loan at 20% due in June alongside a 500,000 mortgage
+at 5%, avalanche, 25,000/month available, month 0 = October. The pot fills in
+months 0-2 (25,000 + 25,000 + 2,500, ending at exactly the 52,500 owed), the
+mortgage takes the 22,500 of overflow from month 2 onward, and the June release
+pays 57,500 and closes the loan. Payoff 24 months, total interest 35,803.51.
+Uncapped this pooled 225,000, paid 57,500, deleted 167,500, and reported 31
+months and 51,111.85.
 
 Many agricultural and seasonal loans work this way and the difference in total
 interest is material.
@@ -328,17 +378,50 @@ the debt is not falling.
 noMoreCashComing = installmentTotal === 0        // every plan has expired
                 && emergencyContribution === 0   // fund is at target
                 && buffer === 0
-                && no override has fromMonth > month   // schedules exhausted
+                && no override has fromMonth in (month, month + 12]  // see below
                 && every open loan's holdingPot is empty  // no annual payment pending
 
-if noMoreCashComing and totalDebt >= totalDebt(previous month):
+if noMoreCashComing and not closedThisMonth
+                    and totalDebt >= totalDebt(previous month):
     IsInfeasible = true
+    InfeasibleReason = 'debtNotFalling'
     MinimumViablePayment = sum of (principal * rate / 12) over open loans
     break
 ```
 
+`closedThisMonth` — **a loan closing this month is itself proof the plan is
+progressing**, so the guard must never fire on such a month. Without it, a
+month whose attack money finishes off one debt can look flat on the remaining
+ones and report a false `IsInfeasible` on a portfolio that in fact pays off
+comfortably. (The step 7 cascade removes the usual cause; this clause is the
+belt to its braces.)
+
+The override look-ahead is **bounded to 12 months** (`hasFutureOverride`'s
+`withinMonths`). An unbounded `fromMonth > month` test lets a single stale
+override at, say, month 400 keep the guard switched off for 400 months, so a
+portfolio whose debt is visibly growing grinds all the way to `maxMonths`
+instead of reporting infeasibility. One year is the horizon over which a
+household budget change is plausibly real.
+
 `maxMonths = 600` remains as a final hard stop. Infeasible input returns a
 structured result — it never hangs and never throws.
+
+### The three infeasible modes
+
+`InfeasibleReason` names which one ended the run, because the useful number
+differs:
+
+| `InfeasibleReason` | Cause | The number to show |
+|---|---|---|
+| `'budgetShortfall'` | step 2's `surplus < 0` | `MonthlyShortfall` |
+| `'debtNotFalling'` | the guard above | `MinimumViablePayment` |
+| `'horizonExhausted'` | `maxMonths` reached with debt open | `MinimumViablePayment` |
+
+`MonthlyShortfall` is the magnitude of the negative surplus — how much more
+cash the month needs before a single baht can reach any debt. It is the only
+honest figure for `'budgetShortfall'`: there the obligations simply outrun the
+income, and with no interest-bearing debt in the portfolio at all
+`MinimumViablePayment` is a meaningless `0`.
 
 ### Output
 
@@ -350,19 +433,32 @@ Projection {
   InterestArrearsClearedMonth,   // null when there were none
   MonthlyInterestThreshold,
   IsInfeasible,
-  MinimumViablePayment           // set when IsInfeasible
+  InfeasibleReason,              // 'budgetShortfall' | 'debtNotFalling'
+                                 // | 'horizonExhausted' | null
+  MinimumViablePayment,          // interest floor; set when IsInfeasible
+  MonthlyShortfall               // set only for 'budgetShortfall'
 }
 
+// 13 fields
 MonthlyProjection {
   Index, Month,
   InstallmentTotal, Surplus,
   EmergencyContribution, LoanPayment,
+  HeldForAnnualPayment,          // added to holding pots THIS month
   InterestAccrued, AccruedInterestBalance,
   PrincipalBalance, EmergencyFundBalance,
   DiscretionaryCeiling,
-  perDebt: [{ debtId, paid, interestPortion, principalPortion, balance }]
+  perDebt: [{ debtId, paid, interestPortion, principalPortion, balance, held }]
 }
 ```
+
+`perDebt[].paid` counts money paid to the debt this month, which for an
+annually-due loan includes a pot release funded in earlier months.
+`perDebt[].held` is that loan's pot balance at the end of the month. So the
+cash that actually left a month's budget is
+`sum(paid) + sum(held_now - held_prev)`, and that must equal the month's
+`availableForLoan` whenever any debt could still absorb another baht — the
+money-conservation invariant asserted in the tests.
 
 `perDebt` is an addition to the source spec, required because multi-loan
 payments cannot otherwise be displayed or debugged.
@@ -403,6 +499,25 @@ nothing.
 
 Ranked descending. Each rank carries a plain-language Thai reason so the UI
 never invents one.
+
+**When the projection is infeasible the ranking cannot be derived from it.**
+`simulate` truncates its rows, so summing `perDebt[].interestPortion` collapses
+an amortizing debt's `totalRemainingCost` toward zero and can rank a real
+interest-bearing loan *below* a hire-purchase rebate — inverting the order the
+UI presents as an action plan. In that case:
+
+- every row carries `rankingUnreliable: true` (`false` on a feasible run)
+- amortizing rows report `totalRemainingCost: null` — no interest estimate is
+  ever fabricated — with a reason saying the budget must be fixed first
+- those rows are pinned **above** the non-amortizing ones (an interest-bearing
+  debt always costs more to carry than a 0% plan), ordered by descending
+  `annualRatePct` then descending balance, both facts about the debt itself
+- `installment` and `hirePurchase` rows are unaffected: their cost never came
+  from the projection
+
+Every returned row therefore has the shape
+`{ debtId, name, type, totalRemainingCost, quoteMissing, rebateDecayPerMonth,
+rankingUnreliable, reason }`.
 
 `hirePurchase` also exposes `RebateDecayPerMonth` — the rebate shrinks every
 period, and users routinely plan around a rebate that will have mostly
@@ -591,7 +706,7 @@ export const GOLDEN_START = { year: 2026, month: 10 };  // Month 0 = October
 
 ### `payoffSimulator.golden.test.js`
 
-All 14 assertions from the §8 table:
+All 13 assertions from the §8 table:
 
 | Assertion | Value |
 |---|---|
@@ -659,12 +774,52 @@ requirement:
    minimum — minimums are paid in order until the money runs out; nothing goes
    negative and nothing throws
 
+### `payoffSimulator.cascade.test.js`
+
+The money-conservation invariant and the step 7 regressions. This file exists
+because nothing else asserted that a month's payments equal the money the month
+had, which is how the destroyed-cash defects survived four review passes.
+
+1. **The invariant** — for every month, `sum(perDebt[].paid) + Σ(held_now -
+   held_prev)` equals the month's `availableForLoan` (re-derived from the row's
+   own `Surplus`, `EmergencyContribution` and the buffer resolved for that
+   month, not from the loop), within `EPS`. The equality is asserted whenever
+   any debt could still absorb another baht — capacity being `balance - held` —
+   and relaxed to `<=` only when every debt is full. Applied to the golden
+   fixture, a closing debt under both `avalanche` and `snowball`, the
+   holding-pot path, and the minimums-exceed-budget case.
+2. **Cascade** — two loans of 100,000 at 5% and 25%, 25,000/month, `avalanche`:
+   in month 4 the 25% loan takes its last 5,541.86 and the remaining 19,458.14
+   falls through to the 5% loan. 9 months, 8,384.17 interest. (Non-cascading:
+   10 months, 8,714.88, with 19,458.14 destroyed.)
+3. **Pot cap** — the 50,000-at-20%-annual plus 500,000-at-5%-mortgage fixture
+   above: no pot ever exceeds its loan's balance, the mortgage receives money
+   from month 2, 24 months, 35,803.51 interest. (Uncapped: 31 months,
+   51,111.85, 167,500 destroyed.)
+4. **No false infeasibility** — the same two-loan portfolio under `snowball`,
+   and under `manual` with an empty order, both come back
+   `IsInfeasible: false`. (Before: `IsInfeasible: true`, `MonthsToPayoff: 5`,
+   `MinimumViablePayment: 2,083.33` for a user with 25,000/month of free cash.)
+5. **Budget shortfall** — a hire-purchase of 8,000 plus an installment of 1,000
+   against 12,000 of income and 4,000 of fixed expenses returns
+   `InfeasibleReason: 'budgetShortfall'` and `MonthlyShortfall: 1,000`, not a
+   `MinimumViablePayment` of 0.
+6. **Bounded override look-ahead** — a flat portfolio reports infeasibility on
+   month 0 even with a leftover override at month 400, but still waits when the
+   override lands within the 12-month window.
+7. **`manual`** — an explicit `manualOrder` overrides both rate and balance; an
+   empty or missing order falls back to the first open debt.
+
 ### `strategyRanker.test.js`
 
 - `installment` yields `TotalRemainingCost === 0` even on a large balance
 - `hirePurchase` with no `settlementQuote` is flagged `quoteMissing`, never
   given an estimated figure
 - ranking is descending by `TotalRemainingCost`
+- a feasible projection leaves every row `rankingUnreliable: false`
+- an **infeasible** projection flags every row `rankingUnreliable: true`, gives
+  the amortizing rows `totalRemainingCost: null`, and still keeps the
+  interest-bearing loan above the hire-purchase rebate
 
 ## Build order
 
@@ -672,7 +827,7 @@ requirement:
 |---|---|---|
 | 1 | vitest, `types.js`, `goldenFixture.js`, all test files (**all failing**) | `npm test` runs and reports failures |
 | 2 | `debtMath.js` — balances, the three minimum-payment modes, `resolveSchedule`, rebate decay | its unit tests pass |
-| 3 | `payoffSimulator.js`, single-loan path — **all 14 §8 assertions plus both sensitivity tables** | golden tests green; resolve the `TotalInterestPaid` checkpoint here |
+| 3 | `payoffSimulator.js`, single-loan path — **all 13 §8 assertions plus both sensitivity tables** | golden tests green; resolve the `TotalInterestPaid` checkpoint here |
 | 4 | extend to multi-loan and the three strategies — tests 6–9 pass **and §8 is still green** | whole suite green |
 | 5 | `acceptsEarlyPayment === false` path and the non-termination guard — edge cases 1 and 3 | whole suite green |
 | 6 | `strategyRanker.js` | ranker tests pass |

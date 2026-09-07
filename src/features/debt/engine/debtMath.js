@@ -43,9 +43,25 @@ export const resolveSchedule = (defaultValue, overrides, month) => {
   return value;
 };
 
-/** True when some override has not taken effect yet, i.e. more cash may free up. */
-export const hasFutureOverride = (overrides, month) =>
-  (overrides || []).some((o) => Number(o.fromMonth) > month);
+/** How far ahead an override still counts as "cash on its way". See below. */
+export const OVERRIDE_LOOKAHEAD_MONTHS = 12;
+
+/**
+ * True when some override has not taken effect yet, i.e. more cash may free up.
+ *
+ * Bounded to the next `withinMonths` months. An unbounded test lets a single
+ * stale override at, say, month 400 keep the non-termination guard switched
+ * off for 400 months, so a portfolio whose debt is visibly growing grinds all
+ * the way to maxMonths instead of reporting infeasibility. One year is the
+ * horizon over which a household budget change is plausibly real; a schedule
+ * step further out than that is no evidence that this month's stalled plan is
+ * about to recover.
+ */
+export const hasFutureOverride = (overrides, month, withinMonths = OVERRIDE_LOOKAHEAD_MONTHS) =>
+  (overrides || []).some((o) => {
+    const from = Number(o.fromMonth);
+    return Number.isFinite(from) && from > month && from - month <= withinMonths;
+  });
 
 /** One month of interest on the outstanding principal. */
 export const monthlyInterest = (loan) =>

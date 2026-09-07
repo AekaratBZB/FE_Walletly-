@@ -78,6 +78,28 @@ describe('hasFutureOverride', () => {
     expect(hasFutureOverride([{ fromMonth: 3, amount: 3000 }], 3)).toBe(false);
     expect(hasFutureOverride([], 0)).toBe(false);
   });
+
+  it('ignores a stale override far beyond the look-ahead window', () => {
+    // A leftover step at month 400 is not evidence that this month's stalled
+    // plan is about to recover; unbounded, it disables the non-termination
+    // guard for 400 months.
+    expect(hasFutureOverride([{ fromMonth: 400, amount: 3000 }], 0)).toBe(false);
+    expect(hasFutureOverride([{ fromMonth: 400, amount: 3000 }], 388)).toBe(true);
+  });
+
+  it('counts an override exactly at the edge of the window', () => {
+    expect(hasFutureOverride([{ fromMonth: 12, amount: 1 }], 0)).toBe(true);
+    expect(hasFutureOverride([{ fromMonth: 13, amount: 1 }], 0)).toBe(false);
+  });
+
+  it('accepts an explicit window', () => {
+    expect(hasFutureOverride([{ fromMonth: 5, amount: 1 }], 0, 3)).toBe(false);
+    expect(hasFutureOverride([{ fromMonth: 5, amount: 1 }], 0, 5)).toBe(true);
+  });
+
+  it('ignores a non-numeric fromMonth', () => {
+    expect(hasFutureOverride([{ fromMonth: 'later', amount: 1 }], 0)).toBe(false);
+  });
 });
 
 describe('monthlyInterest', () => {
