@@ -27,6 +27,7 @@ Task 9 completes UI phase 1 — the working vertical slice.
 
 Create `src/features/debt/AddDebtModal.jsx`:
 
+<!-- sync:src/features/debt/AddDebtModal.jsx -->
 ```jsx
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../../components/Modal';
@@ -72,10 +73,55 @@ export const AddDebtModal = () => {
   const setMin = (patch) =>
     setForm((prev) => ({ ...prev, minimumPayment: { ...prev.minimumPayment, ...patch } }));
 
+  /**
+   * The form holds one flat object covering all three types, so switching type
+   * mid-edit leaves the other type's fields populated. Nothing in the engine
+   * reads them — it partitions on `type` alone — but a stale `monthlyPayment`
+   * on an amortizing debt would show a figure in the list's "ค่างวด/เดือน"
+   * column that no calculation ever uses. Keep only the fields the chosen type
+   * actually owns.
+   */
+  const normalise = (d) => {
+    const base = {
+      id: d.id,
+      name: d.name.trim(),
+      type: d.type,
+      isClosed: Boolean(d.isClosed)
+    };
+
+    if (d.type === 'amortizing') {
+      return {
+        ...base,
+        principal: d.principal,
+        accruedInterest: d.accruedInterest,
+        annualRatePct: d.annualRatePct,
+        frequency: d.frequency,
+        annualDueMonth: d.acceptsEarlyPayment ? null : d.annualDueMonth,
+        acceptsEarlyPayment: d.acceptsEarlyPayment,
+        minimumPayment: d.minimumPayment
+      };
+    }
+
+    const fixed = {
+      ...base,
+      monthlyPayment: d.monthlyPayment,
+      periodsPaid: d.periodsPaid,
+      periodsTotal: d.periodsTotal
+    };
+
+    return d.type === 'hirePurchase'
+      ? {
+          ...fixed,
+          settlementQuote: d.settlementQuote,
+          settlementQuoteDate: d.settlementQuoteDate
+        }
+      : fixed;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.name.trim()) return;
-    saveDebt({ ...form, name: form.name.trim() });
+    saveDebt(normalise(form));
   };
 
   const isAmortizing = form.type === 'amortizing';
@@ -360,6 +406,7 @@ export const AddDebtModal = () => {
 
 Create `src/features/debt/DebtListPanel.jsx`:
 
+<!-- sync:src/features/debt/DebtListPanel.jsx -->
 ```jsx
 import React from 'react';
 import { useWallet } from '../../context/WalletContext';
@@ -410,10 +457,23 @@ const DebtRow = ({ debt, onEdit, onDelete }) => {
             ขอใบเสนอปิดบัญชีจากเจ้าหนี้ เพื่อรู้ส่วนลดที่ได้จริง
           </div>
         )}
-        {debt.type === 'hirePurchase' && rebate !== null && (
+        {/* A lender quote above the remaining payments means settling early
+            costs more than simply continuing, so "ประหยัด" would be wrong. */}
+        {debt.type === 'hirePurchase' && rebate !== null && rebate < 0 && (
+          <div className="text-xs text-warning mt-1 num-font">
+            ยอดปิดบัญชีสูงกว่าค่างวดที่เหลือ {formatCurrency(Math.round(-rebate))} —
+            ปิดตอนนี้แพงกว่าผ่อนต่อ
+          </div>
+        )}
+        {debt.type === 'hirePurchase' && rebate !== null && rebate === 0 && (
+          <div className="text-xs text-muted mt-1">
+            ยอดปิดบัญชีเท่ากับค่างวดที่เหลือพอดี — ปิดตอนนี้ไม่ประหยัดและไม่แพงขึ้น
+          </div>
+        )}
+        {debt.type === 'hirePurchase' && rebate !== null && rebate > 0 && (
           <div className="text-xs text-muted mt-1 num-font">
             ปิดบัญชีวันนี้ประหยัด {formatCurrency(Math.round(rebate))}
-            {decay !== null && (
+            {decay !== null && decay > 0 && (
               <> · ส่วนลดหดเดือนละ {formatCurrency(Math.round(decay))}</>
             )}
           </div>
@@ -636,6 +696,7 @@ git commit -m "feat: add debt CRUD list and add/edit modal"
 
 Create `src/features/debt/ScheduleTable.jsx`:
 
+<!-- sync:src/features/debt/ScheduleTable.jsx -->
 ```jsx
 import React, { useState } from 'react';
 import { formatCurrency, formatMonthLabel } from '../../shared/formatters';
@@ -647,8 +708,10 @@ import { CalendarRange } from 'lucide-react';
  * debugging tool for the engine as well as a user-facing view.
  */
 export const ScheduleTable = ({ projection }) => {
+  // 'all' rather than a hardcoded row cap, so the option cannot silently drift
+  // out of step with the engine's own horizon.
   const [limit, setLimit] = useState(24);
-  const rows = projection.Months.slice(0, limit);
+  const rows = limit === 'all' ? projection.Months : projection.Months.slice(0, limit);
 
   if (!projection.Months.length) {
     return null;
@@ -673,12 +736,14 @@ export const ScheduleTable = ({ projection }) => {
             className="form-select"
             style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', width: '130px' }}
             value={limit}
-            onChange={(e) => setLimit(parseInt(e.target.value, 10))}
+            onChange={(e) =>
+              setLimit(e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10))
+            }
           >
             <option value="12">12 เดือนแรก</option>
             <option value="24">24 เดือนแรก</option>
             <option value="60">60 เดือนแรก</option>
-            <option value="600">ทั้งหมด</option>
+            <option value="all">ทั้งหมด ({projection.Months.length} เดือน)</option>
           </select>
         </div>
       </div>
@@ -772,6 +837,9 @@ export const ScheduleTable = ({ projection }) => {
 
       <div className="text-xs text-subtle mt-2">
         "เพดานงบกินใช้" คือระดับการใช้จ่ายที่หนี้หยุดลดในเดือนนั้น — เป็นขีดจำกัด ไม่ใช่เป้า
+      </div>
+      <div className="text-xs text-subtle mt-1">
+        นี่คือการฉายภาพจากตัวเลขที่คุณกรอกเอง ไม่ใช่คำแนะนำทางการเงินหรือการลงทุน
       </div>
     </div>
   );

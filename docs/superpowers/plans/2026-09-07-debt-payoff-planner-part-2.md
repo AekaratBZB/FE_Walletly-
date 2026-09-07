@@ -38,6 +38,7 @@ always on screen, no `canvas-confetti`, commit after every task.
 
 Create `src/features/debt/debtStorage.js`:
 
+<!-- sync:src/features/debt/debtStorage.js -->
 ```js
 /**
  * Persistence for the debt planner.
@@ -160,6 +161,7 @@ export const findDebtCandidates = (fixedCosts = []) =>
 
 Create `src/features/debt/useDebtState.js`:
 
+<!-- sync:src/features/debt/useDebtState.js -->
 ```js
 import { useState, useEffect } from 'react';
 import {
@@ -221,7 +223,10 @@ export const useDebtState = ({
 
   const saveDebt = (debt) => {
     if (debt.id && debts.some((d) => d.id === debt.id)) {
-      setDebts((prev) => prev.map((d) => (d.id === debt.id ? { ...d, ...debt } : d)));
+      // Replace rather than merge. The modal submits a complete record for the
+      // chosen type, so merging would preserve fields belonging to the type the
+      // debt used to be.
+      setDebts((prev) => prev.map((d) => (d.id === debt.id ? debt : d)));
       addToast(`แก้ไขหนี้ "${debt.name}" เรียบร้อยแล้ว`, 'success');
     } else {
       const created = { ...debt, id: debt.id || `debt-${Date.now()}`, isClosed: false };
@@ -448,11 +453,31 @@ and add this case to `renderActiveTab`, directly after the `projection` case:
 
 Create `src/features/debt/PayoffSummaryCards.jsx`:
 
+<!-- sync:src/features/debt/PayoffSummaryCards.jsx -->
 ```jsx
 import React from 'react';
 import { StatCard } from '../../components/StatCard';
 import { formatCurrency, formatMonthLabel } from '../../shared/formatters';
+import { outstandingBalance, periodsRemaining } from './engine/debtMath';
 import { CalendarCheck, Coins, TrendingDown, AlertTriangle } from 'lucide-react';
+
+/**
+ * Balance still owed on the fixed-schedule debts (hirePurchase, installment)
+ * as of a given 0-based month index into the projection.
+ *
+ * The engine never tracks a declining balance for these — it only knows the
+ * flat monthly payment and how many of the plan's periods are still ahead of
+ * `startMonth` (see payoffSimulator's fixedObligations). So the balance as of
+ * month `atIndex` is what is left after `atIndex + 1` payments have been made:
+ * monthlyPayment x periods still owed beyond this month.
+ */
+const stillRunningFixedBalance = (debts, atIndex) =>
+  (debts || [])
+    .filter((d) => d.type === 'hirePurchase' || d.type === 'installment')
+    .reduce((sum, d) => {
+      const remaining = Math.max(0, periodsRemaining(d) - (atIndex + 1));
+      return sum + (Number(d.monthlyPayment) || 0) * remaining;
+    }, 0);
 
 /**
  * Summary cards, the infeasible banner, and the assumptions box.
@@ -460,23 +485,29 @@ import { CalendarCheck, Coins, TrendingDown, AlertTriangle } from 'lucide-react'
  * The assumptions box is always visible and never a tooltip: the whole
  * projection rests on user-entered numbers, so if the food budget is a guess,
  * the payoff date is a guess.
- *
- * Values go through `Math.round` then `formatCurrency` like every other
- * display site in this feature — `formatCurrency` folds any -0 that
- * produces, so there is no local rounding helper here.
  */
-export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => {
+export const PayoffSummaryCards = ({ projection, budgetProfile, debts }) => {
+  const openDebts = debts || [];
   const last = projection.Months.length
     ? projection.Months[projection.Months.length - 1]
     : null;
 
+  // Card 4, IsInfeasible variant: the amortizing balances the engine tracked
+  // plus whatever is still owed on installment/hire-purchase plans that are
+  // still running at the month the simulation stopped. Reporting the
+  // amortizing figure alone under-reports real debt for any portfolio that
+  // also carries a hire-purchase or an installment plan.
   const debtRemaining = last
-    ? last.PrincipalBalance + last.AccruedInterestBalance
+    ? last.PrincipalBalance +
+      last.AccruedInterestBalance +
+      stillRunningFixedBalance(openDebts, last.Index)
     : 0;
 
-  const startingDebt = projection.Months.length
-    ? projection.Months[0].PrincipalBalance + projection.Months[0].AccruedInterestBalance
-    : 0;
+  // Card 4, feasible variant: the true starting balance across every open
+  // debt, using the same product-rule math the engine and the debt list use
+  // (outstandingBalance never applies an interest formula to hirePurchase or
+  // installment).
+  const startingDebt = openDebts.reduce((sum, d) => sum + outstandingBalance(d), 0);
 
   return (
     <>
@@ -521,7 +552,7 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => 
           value={formatCurrency(
             Math.round(projection.IsInfeasible ? debtRemaining : startingDebt)
           )}
-          subtext={`${debtCount} รายการในแผน`}
+          subtext={`${openDebts.length} รายการในแผน`}
           icon={AlertTriangle}
           colorScheme="rose"
           valueClass="text-danger"
@@ -537,12 +568,43 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => 
             🔴 งบปัจจุบันยังปิดหนี้ไม่ได้
           </div>
           <p className="text-xs text-main mt-1">
-            เงินที่เหลือไปชำระหนี้น้อยกว่าดอกเบี้ยที่เดินในแต่ละเดือน หนี้จึงไม่ลดลง
-            ต้องมีเงินเข้าชำระหนี้อย่างน้อย{' '}
-            <b className="num-font">
-              {formatCurrency(Math.round(projection.MinimumViablePayment || 0))}
-            </b>{' '}
-            ต่อเดือน หนี้จึงจะเริ่มลด — ลดงบกินใช้ หรือเพิ่มรายได้เสริม
+            {projection.InfeasibleReason === 'budgetShortfall' && (
+              <>
+                ค่าใช้จ่ายคงที่ งบกินใช้ และค่างวดผ่อนของเดือนนี้รวมกันมากกว่ารายได้ที่มี
+                เงินจึงไม่เหลือไปถึงหนี้เลยแม้แต่บาทเดียว ต้องหาเงินเพิ่มอีกอย่างน้อย{' '}
+                <b className="num-font">
+                  {formatCurrency(Math.round(projection.MonthlyShortfall))}
+                </b>{' '}
+                ต่อเดือน หรือลดค่าใช้จ่ายลงให้พอ ก่อนจะเริ่มโปะหนี้ได้
+              </>
+            )}
+            {/* A 0% amortizing debt receiving nothing also stops falling, and
+                then the interest floor is genuinely zero — quoting it as the
+                amount needed would be meaningless, so name the real problem. */}
+            {projection.InfeasibleReason === 'debtNotFalling' &&
+              Math.round(projection.MinimumViablePayment) <= 0 && (
+                <>
+                  ไม่มีเงินเหลือไปถึงหนี้เลยในแต่ละเดือน ยอดหนี้จึงไม่ขยับ
+                  ต้องลดงบกินใช้ หรือเพิ่มรายได้เสริม ให้มีเงินเหลือไปชำระหนี้ก่อน
+                </>
+              )}
+            {projection.InfeasibleReason === 'debtNotFalling' &&
+              Math.round(projection.MinimumViablePayment) > 0 && (
+                <>
+                  เงินที่เหลือไปชำระหนี้น้อยกว่าดอกเบี้ยที่เดินในแต่ละเดือน หนี้จึงไม่ลดลง
+                  ต้องมีเงินเข้าชำระหนี้อย่างน้อย{' '}
+                  <b className="num-font">
+                    {formatCurrency(Math.round(projection.MinimumViablePayment))}
+                  </b>{' '}
+                  ต่อเดือน หนี้จึงจะเริ่มลด — ลดงบกินใช้ หรือเพิ่มรายได้เสริม
+                </>
+              )}
+            {projection.InfeasibleReason === 'horizonExhausted' && (
+              <>
+                ด้วยตัวเลขงบประมาณปัจจุบัน แผนนี้ยังปิดหนี้ไม่จบภายใน 50 ปีที่ระบบคำนวณให้
+                ต้องลดงบกินใช้หรือเพิ่มรายได้เสริมให้มากขึ้นกว่านี้
+              </>
+            )}
           </p>
         </div>
       )}
@@ -669,10 +731,11 @@ git commit -m "feat: add debt planner tab shell and payoff summary cards"
 
 Create `src/features/debt/BudgetProfilePanel.jsx`:
 
+<!-- sync:src/features/debt/BudgetProfilePanel.jsx -->
 ```jsx
 import React from 'react';
 import { useWallet } from '../../context/WalletContext';
-import { Wallet, Plus, Trash2 } from 'lucide-react';
+import { Wallet, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 
 const NumberField = ({ label, hint, value, onChange }) => (
   <div className="form-group">
@@ -752,8 +815,90 @@ const ScheduleEditor = ({ label, overrides, onChange }) => {
   );
 };
 
+/**
+ * Order editor for the manual strategy.
+ *
+ * Only `amortizing` debts can receive attack money — the engine pays fixed
+ * obligations on their own schedule — so only they are orderable. The list is
+ * always seeded from the current debts, so selecting Manual never shows a blank
+ * panel and a debt added later cannot silently fall off the end of the order.
+ */
+const ManualOrderEditor = ({ debts, manualOrder, onChange }) => {
+  const orderable = (debts || []).filter((d) => !d.isClosed && d.type === 'amortizing');
+
+  if (!orderable.length) {
+    return (
+      <div className="text-xs text-subtle mb-2">
+        ยังไม่มีหนี้ที่คิดดอกเบี้ยให้จัดลำดับ — โหมดนี้จัดลำดับได้เฉพาะหนี้แบบลดต้นลดดอก
+        เพราะหนี้ผ่อนกับเช่าซื้อจ่ายตามงวดในสัญญาอยู่แล้ว
+      </div>
+    );
+  }
+
+  // Ids the user has ordered, minus any that no longer exist, plus any debt
+  // they have not placed yet — appended in the order the debts were added.
+  const ordered = (manualOrder || []).filter((id) => orderable.some((d) => d.id === id));
+  const effective = [
+    ...ordered,
+    ...orderable.filter((d) => !ordered.includes(d.id)).map((d) => d.id)
+  ];
+
+  const nameOf = (id) => orderable.find((d) => d.id === id);
+
+  const move = (index, delta) => {
+    const next = [...effective];
+    const target = index + delta;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange(next);
+  };
+
+  return (
+    <div className="form-group">
+      <label className="form-label">ลำดับที่จะโปะ (บนสุดได้เงินก่อน)</label>
+
+      {effective.map((id, i) => {
+        const debt = nameOf(id);
+        return (
+          <div key={id} className="flex gap-2 items-center mb-1">
+            <span className="text-xs text-muted num-font" style={{ width: '18px' }}>
+              {i + 1}.
+            </span>
+            <span className="text-xs text-main flex-1">
+              {debt.name}{' '}
+              <span className="text-muted num-font">{debt.annualRatePct}% ต่อปี</span>
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              title="เลื่อนขึ้น"
+              disabled={i === 0}
+              onClick={() => move(i, -1)}
+            >
+              <ChevronUp size={14} />
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              title="เลื่อนลง"
+              disabled={i === effective.length - 1}
+              onClick={() => move(i, 1)}
+            >
+              <ChevronDown size={14} />
+            </button>
+          </div>
+        );
+      })}
+
+      <div className="text-xs text-subtle mt-1">
+        เงินที่เหลือหลังจ่ายขั้นต่ำทุกก้อนจะทุ่มลงก้อนบนสุดก่อน แล้วไล่ลงมา
+      </div>
+    </div>
+  );
+};
+
 export const BudgetProfilePanel = () => {
-  const { budgetProfile, updateBudgetProfile } = useWallet();
+  const { budgetProfile, updateBudgetProfile, debts } = useWallet();
   const p = budgetProfile;
   const set = (key) => (value) => updateBudgetProfile({ [key]: value });
 
@@ -852,6 +997,14 @@ export const BudgetProfilePanel = () => {
           <option value="manual">Manual — เรียงลำดับเอง</option>
         </select>
       </div>
+
+      {p.strategy === 'manual' && (
+        <ManualOrderEditor
+          debts={debts}
+          manualOrder={p.manualOrder}
+          onChange={(v) => updateBudgetProfile({ manualOrder: v })}
+        />
+      )}
     </div>
   );
 };

@@ -137,6 +137,7 @@ In `package.json`, replace the `"scripts"` block with:
 
 Create `src/features/debt/engine/types.js`:
 
+<!-- sync:src/features/debt/engine/types.js -->
 ```js
 /**
  * JSDoc typedefs for the debt payoff engine. No runtime code — this file
@@ -225,6 +226,16 @@ Create `src/features/debt/engine/types.js`:
  * @property {'budgetShortfall'|'debtNotFalling'|'horizonExhausted'|null} InfeasibleReason
  * @property {number|null} MinimumViablePayment
  * @property {number|null} MonthlyShortfall
+ *
+ * @typedef {Object} RankedDebt
+ * @property {string} debtId
+ * @property {string} name
+ * @property {DebtType} type
+ * @property {number|null} totalRemainingCost  null => not computable, see rankingUnreliable
+ * @property {boolean} quoteMissing
+ * @property {number|null} rebateDecayPerMonth
+ * @property {boolean} rankingUnreliable  true on every row when the projection is infeasible
+ * @property {string} reason
  */
 
 export {};
@@ -234,6 +245,7 @@ export {};
 
 Create `src/features/debt/engine/__tests__/debtMath.test.js`:
 
+<!-- sync:src/features/debt/engine/__tests__/debtMath.test.js -->
 ```js
 import { describe, it, expect } from 'vitest';
 import {
@@ -314,6 +326,28 @@ describe('hasFutureOverride', () => {
   it('is false once every override has taken effect', () => {
     expect(hasFutureOverride([{ fromMonth: 3, amount: 3000 }], 3)).toBe(false);
     expect(hasFutureOverride([], 0)).toBe(false);
+  });
+
+  it('ignores a stale override far beyond the look-ahead window', () => {
+    // A leftover step at month 400 is not evidence that this month's stalled
+    // plan is about to recover; unbounded, it disables the non-termination
+    // guard for 400 months.
+    expect(hasFutureOverride([{ fromMonth: 400, amount: 3000 }], 0)).toBe(false);
+    expect(hasFutureOverride([{ fromMonth: 400, amount: 3000 }], 388)).toBe(true);
+  });
+
+  it('counts an override exactly at the edge of the window', () => {
+    expect(hasFutureOverride([{ fromMonth: 12, amount: 1 }], 0)).toBe(true);
+    expect(hasFutureOverride([{ fromMonth: 13, amount: 1 }], 0)).toBe(false);
+  });
+
+  it('accepts an explicit window', () => {
+    expect(hasFutureOverride([{ fromMonth: 5, amount: 1 }], 0, 3)).toBe(false);
+    expect(hasFutureOverride([{ fromMonth: 5, amount: 1 }], 0, 5)).toBe(true);
+  });
+
+  it('ignores a non-numeric fromMonth', () => {
+    expect(hasFutureOverride([{ fromMonth: 'later', amount: 1 }], 0)).toBe(false);
   });
 });
 
@@ -440,6 +474,7 @@ Expected: FAIL — `Failed to resolve import "../debtMath"`.
 
 Create `src/features/debt/engine/debtMath.js`:
 
+<!-- sync:src/features/debt/engine/debtMath.js -->
 ```js
 /**
  * Pure math helpers for the debt payoff engine.
@@ -486,7 +521,7 @@ export const resolveSchedule = (defaultValue, overrides, month) => {
   return value;
 };
 
-/** How far ahead an override still counts as "cash on its way". */
+/** How far ahead an override still counts as "cash on its way". See below. */
 export const OVERRIDE_LOOKAHEAD_MONTHS = 12;
 
 /**
@@ -495,7 +530,10 @@ export const OVERRIDE_LOOKAHEAD_MONTHS = 12;
  * Bounded to the next `withinMonths` months. An unbounded test lets a single
  * stale override at, say, month 400 keep the non-termination guard switched
  * off for 400 months, so a portfolio whose debt is visibly growing grinds all
- * the way to maxMonths instead of reporting infeasibility.
+ * the way to maxMonths instead of reporting infeasibility. One year is the
+ * horizon over which a household budget change is plausibly real; a schedule
+ * step further out than that is no evidence that this month's stalled plan is
+ * about to recover.
  */
 export const hasFutureOverride = (overrides, month, withinMonths = OVERRIDE_LOOKAHEAD_MONTHS) =>
   (overrides || []).some((o) => {
@@ -591,6 +629,7 @@ This is the task the whole feature rests on. Do not proceed past it with a red s
 
 Create `src/features/debt/engine/__tests__/goldenFixture.js`:
 
+<!-- sync:src/features/debt/engine/__tests__/goldenFixture.js -->
 ```js
 /**
  * The §8 golden fixture from the source spec, as data.
@@ -662,6 +701,7 @@ export const GOLDEN_START = { year: 2026, month: 10 };
 
 Create `src/features/debt/engine/__tests__/payoffSimulator.golden.test.js`:
 
+<!-- sync:src/features/debt/engine/__tests__/payoffSimulator.golden.test.js -->
 ```js
 import { describe, it, expect } from 'vitest';
 import { simulate } from '../payoffSimulator';
@@ -787,6 +827,7 @@ Expected: FAIL — `Failed to resolve import "../payoffSimulator"`.
 
 Create `src/features/debt/engine/payoffSimulator.js`:
 
+<!-- sync:src/features/debt/engine/payoffSimulator.js -->
 ```js
 import {
   periodsRemaining,
@@ -833,6 +874,43 @@ const pay = (loan, amount) => {
 };
 
 const balanceOf = (loan) => loan.principal + loan.accruedInterest;
+
+/**
+ * Builds one MonthlyProjection row. Both the infeasible-budget early return
+ * and the normal end-of-iteration path funnel through here so the row's
+ * 13-key shape is declared exactly once. Values are passed through untouched
+ * — no rounding, no derived fields — this is purely a single point of truth
+ * for the shape.
+ */
+const buildMonthRow = ({
+  index,
+  month,
+  installmentTotal,
+  surplus,
+  emergencyContribution,
+  loanPayment,
+  heldForAnnualPayment,
+  interestAccrued,
+  arrearsBalance,
+  principalBalance,
+  emergencyFundBalance,
+  discretionaryCeiling,
+  perDebt
+}) => ({
+  Index: index,
+  Month: month,
+  InstallmentTotal: installmentTotal,
+  Surplus: surplus,
+  EmergencyContribution: emergencyContribution,
+  LoanPayment: loanPayment,
+  HeldForAnnualPayment: heldForAnnualPayment,
+  InterestAccrued: interestAccrued,
+  AccruedInterestBalance: arrearsBalance,
+  PrincipalBalance: principalBalance,
+  EmergencyFundBalance: emergencyFundBalance,
+  DiscretionaryCeiling: discretionaryCeiling,
+  perDebt
+});
 
 /** Which single debt gets the money left after every minimum is paid. */
 const pickTarget = (openLoans, budget) => {
@@ -935,31 +1013,34 @@ export const simulate = (debts, budget, options = {}) => {
       // The binding constraint here is NOT interest — the fixed obligations
       // alone outrun the income, and with no interest-bearing debt at all
       // minimumViablePayment is a meaningless 0. MonthlyShortfall is the
-      // honest figure for this failure mode.
+      // honest figure for this failure mode: how much more cash the month
+      // needs before a single baht can reach any debt.
       monthlyShortfall = -surplus;
-      months.push({
-        Index: month,
-        Month: addMonths(startMonth, month),
-        InstallmentTotal: installmentTotal,
-        Surplus: surplus,
-        EmergencyContribution: 0,
-        LoanPayment: 0,
-        HeldForAnnualPayment: 0,
-        InterestAccrued: accrued,
-        AccruedInterestBalance: loans.reduce((s, l) => s + l.accruedInterest, 0),
-        PrincipalBalance: loans.reduce((s, l) => s + l.principal, 0),
-        EmergencyFundBalance: fundCurrent,
-        DiscretionaryCeiling:
-          income + extraIncome - fixedExpenses - installmentTotal - accrued,
-        perDebt: loans.map((l) => ({
-          debtId: l.id,
-          paid: 0,
-          interestPortion: 0,
-          principalPortion: 0,
-          balance: balanceOf(l),
-          held: l.holdingPot
-        }))
-      });
+      months.push(
+        buildMonthRow({
+          index: month,
+          month: addMonths(startMonth, month),
+          installmentTotal,
+          surplus,
+          emergencyContribution: 0,
+          loanPayment: 0,
+          heldForAnnualPayment: 0,
+          interestAccrued: accrued,
+          arrearsBalance: loans.reduce((s, l) => s + l.accruedInterest, 0),
+          principalBalance: loans.reduce((s, l) => s + l.principal, 0),
+          emergencyFundBalance: fundCurrent,
+          discretionaryCeiling:
+            income + extraIncome - fixedExpenses - installmentTotal - accrued,
+          perDebt: loans.map((l) => ({
+            debtId: l.id,
+            paid: 0,
+            interestPortion: 0,
+            principalPortion: 0,
+            balance: balanceOf(l),
+            held: l.holdingPot
+          }))
+        })
+      );
       break;
     }
 
@@ -1101,36 +1182,38 @@ export const simulate = (debts, budget, options = {}) => {
       interestArrearsClearedMonth = month;
     }
 
-    months.push({
-      Index: month,
-      Month: addMonths(startMonth, month),
-      InstallmentTotal: installmentTotal,
-      Surplus: surplus,
-      EmergencyContribution: emergencyContribution,
-      LoanPayment: loanPayment,
-      HeldForAnnualPayment: heldThisMonth,
-      InterestAccrued: interestAccrued,
-      AccruedInterestBalance: arrearsBalance,
-      PrincipalBalance: loans.reduce((s, l) => s + l.principal, 0),
-      EmergencyFundBalance: fundCurrent,
-      DiscretionaryCeiling:
-        income + extraIncome - fixedExpenses - installmentTotal - interestAccrued,
-      perDebt: loans.map((l) => {
-        const r = paidByDebt.get(l.id) || {
-          paid: 0,
-          interestPortion: 0,
-          principalPortion: 0
-        };
-        return {
-          debtId: l.id,
-          paid: r.paid,
-          interestPortion: r.interestPortion,
-          principalPortion: r.principalPortion,
-          balance: balanceOf(l),
-          held: l.holdingPot
-        };
+    months.push(
+      buildMonthRow({
+        index: month,
+        month: addMonths(startMonth, month),
+        installmentTotal,
+        surplus,
+        emergencyContribution,
+        loanPayment,
+        heldForAnnualPayment: heldThisMonth,
+        interestAccrued,
+        arrearsBalance,
+        principalBalance: loans.reduce((s, l) => s + l.principal, 0),
+        emergencyFundBalance: fundCurrent,
+        discretionaryCeiling:
+          income + extraIncome - fixedExpenses - installmentTotal - interestAccrued,
+        perDebt: loans.map((l) => {
+          const r = paidByDebt.get(l.id) || {
+            paid: 0,
+            interestPortion: 0,
+            principalPortion: 0
+          };
+          return {
+            debtId: l.id,
+            paid: r.paid,
+            interestPortion: r.interestPortion,
+            principalPortion: r.principalPortion,
+            balance: balanceOf(l),
+            held: l.holdingPot
+          };
+        })
       })
-    });
+    );
 
     // Non-termination guard. The source spec's "payment <= interest" rule is
     // wrong: that holds for the first seven months of its own fixture, which
@@ -1259,6 +1342,7 @@ order).
 
 Create `src/features/debt/engine/__tests__/payoffSimulator.edge.test.js`:
 
+<!-- sync:src/features/debt/engine/__tests__/payoffSimulator.edge.test.js -->
 ```js
 import { describe, it, expect } from 'vitest';
 import { simulate } from '../payoffSimulator';
@@ -1605,6 +1689,7 @@ git commit -m "test: cover multi-loan strategies, holding pot and infeasible inp
 
 Create `src/features/debt/engine/__tests__/strategyRanker.test.js`:
 
+<!-- sync:src/features/debt/engine/__tests__/strategyRanker.test.js -->
 ```js
 import { describe, it, expect } from 'vitest';
 import { rankDebts } from '../strategyRanker';
@@ -1634,7 +1719,7 @@ describe('rankDebts', () => {
   });
 
   it('costs the amortizing loan at the interest it will actually pay', () => {
-    expect(byId('loan-1').totalRemainingCost).toBeCloseTo(131445.49, 0);
+    expect(byId('loan-1').totalRemainingCost).toBeCloseTo(131445.49, 2);
   });
 
   it('ranks descending by cost, so the loan leads', () => {
@@ -1670,6 +1755,52 @@ describe('rankDebts', () => {
   it('handles an empty debt list', () => {
     expect(rankDebts([], GOLDEN_BUDGET, opts)).toEqual([]);
   });
+
+  it('marks the ranking reliable on a feasible projection', () => {
+    for (const r of ranked) {
+      expect(r.rankingUnreliable).toBe(false);
+    }
+  });
+});
+
+describe('rankDebts on an infeasible projection', () => {
+  // discretionaryBudget 25,000 drives the surplus negative, so the projection
+  // stops after one row and no amortizing interest can be summed from it.
+  const infeasibleBudget = { ...GOLDEN_BUDGET, discretionaryBudget: 25000 };
+  const withQuote = GOLDEN_DEBTS.map((d) =>
+    d.id === 'hp-car' ? { ...d, settlementQuote: 41000 } : d
+  );
+  const ranked = rankDebts(withQuote, infeasibleBudget, opts);
+  const byId = (id) => ranked.find((r) => r.debtId === id);
+
+  it('flags every row as unreliable', () => {
+    for (const r of ranked) {
+      expect(r.rankingUnreliable).toBe(true);
+    }
+  });
+
+  it('refuses to invent an interest figure for the amortizing loan', () => {
+    expect(byId('loan-1').totalRemainingCost).toBeNull();
+    expect(byId('loan-1').reason).toContain('ยังคำนวณดอกเบี้ยรวมไม่ได้');
+  });
+
+  it('keeps the interest-bearing loan above the hire-purchase rebate', () => {
+    // The truncated projection would have costed the loan at 0, ranking it
+    // below the car's 6,236 rebate and inverting the action plan.
+    expect(ranked[0].debtId).toBe('loan-1');
+    expect(byId('hp-car').totalRemainingCost).toBeCloseTo(6236, 2);
+    const carIndex = ranked.findIndex((r) => r.debtId === 'hp-car');
+    expect(carIndex).toBeGreaterThan(0);
+  });
+
+  it('leaves the projection-independent rows descending below it', () => {
+    const rest = ranked.filter((r) => r.totalRemainingCost !== null);
+    for (let i = 1; i < rest.length; i++) {
+      expect(rest[i - 1].totalRemainingCost).toBeGreaterThanOrEqual(
+        rest[i].totalRemainingCost
+      );
+    }
+  });
 });
 ```
 
@@ -1685,6 +1816,7 @@ Expected: FAIL — `Failed to resolve import "../strategyRanker"`.
 
 Create `src/features/debt/engine/strategyRanker.js`:
 
+<!-- sync:src/features/debt/engine/strategyRanker.js -->
 ```js
 import { hirePurchaseRebate, outstandingBalance, rebateDecayPerMonth } from './debtMath';
 import { simulate } from './payoffSimulator';
@@ -1698,13 +1830,17 @@ const baht = (n) => Math.round(n).toLocaleString('th-TH');
  * The amortizing figure comes from a real projection rather than a closed-form
  * approximation, so it accounts for the freed cash as installment plans expire.
  *
+ * @param {import('./types').Debt[]} debts
+ * @param {import('./types').BudgetProfile} budget
  * When the projection is infeasible its rows are truncated, so the interest an
  * amortizing debt will actually pay is unknowable from it — summing the rows
  * collapses `totalRemainingCost` toward zero and can rank a real interest-
- * bearing loan below a hire-purchase rebate, inverting the action plan. In that
- * case every row carries `rankingUnreliable: true`, the amortizing rows report
- * `totalRemainingCost: null` rather than a fabricated estimate, and they are
- * pinned above the non-amortizing rows ordered by rate then balance.
+ * bearing loan below a hire-purchase rebate, inverting the action plan the UI
+ * presents. In that case every row carries `rankingUnreliable: true`, the
+ * amortizing rows report `totalRemainingCost: null` rather than a fabricated
+ * estimate, and they are pinned above the non-amortizing rows (an interest-
+ * bearing debt always costs more to carry than a 0% plan) ordered by rate then
+ * balance — both facts about the debt itself, not about the failed projection.
  *
  * @param {import('./types').Debt[]} debts
  * @param {import('./types').BudgetProfile} budget
@@ -1794,7 +1930,8 @@ export const rankDebts = (debts, budget, options = {}) => {
 
   if (unreliable) {
     // Rows whose cost is unknown-but-real go first, ordered by facts about the
-    // debt rather than by the truncated projection.
+    // debt rather than by the truncated projection. The rest keep their own
+    // projection-independent costs and stay descending below them.
     const rateOf = (r) => {
       const d = (debts || []).find((x) => x.id === r.debtId) || {};
       return Number(d.annualRatePct) || 0;

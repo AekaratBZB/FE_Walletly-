@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sync:plans": "node scripts/sync-plan-code.mjs",
+    "check:plans": "node scripts/sync-plan-code.mjs --check"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.3",

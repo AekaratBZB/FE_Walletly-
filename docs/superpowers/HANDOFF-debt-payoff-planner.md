@@ -11,17 +11,48 @@ closed.
 
 ---
 
-## Read this first: the plan documents are stale
+## The plan documents embed the source, and are kept in sync automatically
 
 `docs/superpowers/plans/2026-09-07-debt-payoff-planner*.md` (four parts)
-contain **complete code blocks for every file**. They were the build
-instructions and they are now behind the shipped code.
+contain **complete code blocks for every file**. That duplication is what made
+them dangerous: seven fix passes landed after they were written, and 17 of
+their 21 whole-file blocks had drifted behind the shipped code. Re-applying
+them verbatim would have reintroduced defects the reviews had already caught.
 
-**The shipped code under `src/` is the truth. The plan is history.**
+They are now synced, and stay synced:
 
-Seven fix passes landed after the plan was written, and the plan's Task 6, 8,
-9 and 11 blocks were not all updated. Re-applying them verbatim would
-reintroduce defects that were found and fixed, including these:
+```bash
+npm run sync:plans     # rewrite any block that has drifted from its file
+npm run check:plans    # report drift and exit 1 — for CI or a pre-commit hook
+```
+
+`scripts/sync-plan-code.mjs` does the work. It only touches blocks a human
+opted in by marking them, on the line immediately before the fence:
+
+```
+<!-- sync:src/features/debt/StrategyPanel.jsx -->
+```
+
+That opt-in matters: not every whole-file block is meant to match the shipped
+file. Task 6 deliberately ships a stub `DebtTab` that Task 11 replaces, so its
+block carries no marker and stays as history. Everything else — 21 blocks — is
+marked and tracked.
+
+In this repo Claude Code also runs the sync on its own: `.claude/settings.json`
+registers a `PostToolUse` hook that pipes the tool payload to
+`node scripts/sync-plan-code.mjs --hook`, which syncs only when the edited file
+is under `src/features/debt/`. It exits 0 whatever happens, so a docs sync can
+never block an edit.
+
+**If you are not running Claude Code**, that hook does nothing for you — run
+`npm run sync:plans` after touching the feature, or wire your own harness's
+equivalent. `npm run check:plans` is the guard worth putting in CI either way.
+
+**Even so: the shipped code under `src/` is the truth, and the spec is
+current.** The plans are a build narrative that now happens to quote the code
+accurately. If they ever disagree with `src/`, the code wins.
+
+For the record, these are the defects the drift would have reintroduced:
 
 | Reintroduced defect | What it did |
 |---|---|
@@ -100,13 +131,9 @@ caught by review.
   the single swap point for a future REST API.
 - No new dependencies beyond `vitest`, which this branch added.
 
-## Two known items, neither blocking
+## One known item, not blocking
 
-**1. Sync the plan documents to the shipped code.** Mechanical. Task 6, 8, 9
-and 11 code blocks in parts 2, 3 and 4. Lowest risk, highest value for anyone
-who reads the plan later, and it removes the trap described at the top.
-
-**2. There are no component tests.** Every finding in the UI is covered only by
+**There are no component tests.** Every finding in the UI is covered only by
 manual browser verification. Two of the final review's five merge blockers lived
 in `.jsx` and were invisible to `npm test` — they would be invisible again.
 
