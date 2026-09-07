@@ -47,10 +47,18 @@ const DebtRow = ({ debt, onEdit, onDelete }) => {
             ขอใบเสนอปิดบัญชีจากเจ้าหนี้ เพื่อรู้ส่วนลดที่ได้จริง
           </div>
         )}
-        {debt.type === 'hirePurchase' && rebate !== null && (
+        {/* A lender quote above the remaining payments means settling early
+            costs more than simply continuing, so "ประหยัด" would be wrong. */}
+        {debt.type === 'hirePurchase' && rebate !== null && rebate < 0 && (
+          <div className="text-xs text-warning mt-1 num-font">
+            ยอดปิดบัญชีสูงกว่าค่างวดที่เหลือ {formatCurrency(Math.round(-rebate))} —
+            ปิดตอนนี้แพงกว่าผ่อนต่อ
+          </div>
+        )}
+        {debt.type === 'hirePurchase' && rebate !== null && rebate >= 0 && (
           <div className="text-xs text-muted mt-1 num-font">
             ปิดบัญชีวันนี้ประหยัด {formatCurrency(Math.round(rebate))}
-            {decay !== null && (
+            {decay !== null && decay > 0 && (
               <> · ส่วนลดหดเดือนละ {formatCurrency(Math.round(decay))}</>
             )}
           </div>

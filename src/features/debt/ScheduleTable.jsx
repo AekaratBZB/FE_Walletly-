@@ -8,8 +8,10 @@ import { CalendarRange } from 'lucide-react';
  * debugging tool for the engine as well as a user-facing view.
  */
 export const ScheduleTable = ({ projection }) => {
+  // 'all' rather than a hardcoded row cap, so the option cannot silently drift
+  // out of step with the engine's own horizon.
   const [limit, setLimit] = useState(24);
-  const rows = projection.Months.slice(0, limit);
+  const rows = limit === 'all' ? projection.Months : projection.Months.slice(0, limit);
 
   if (!projection.Months.length) {
     return null;
@@ -34,12 +36,14 @@ export const ScheduleTable = ({ projection }) => {
             className="form-select"
             style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', width: '130px' }}
             value={limit}
-            onChange={(e) => setLimit(parseInt(e.target.value, 10))}
+            onChange={(e) =>
+              setLimit(e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10))
+            }
           >
             <option value="12">12 เดือนแรก</option>
             <option value="24">24 เดือนแรก</option>
             <option value="60">60 เดือนแรก</option>
-            <option value="600">ทั้งหมด</option>
+            <option value="all">ทั้งหมด ({projection.Months.length} เดือน)</option>
           </select>
         </div>
       </div>
@@ -133,6 +137,9 @@ export const ScheduleTable = ({ projection }) => {
 
       <div className="text-xs text-subtle mt-2">
         "เพดานงบกินใช้" คือระดับการใช้จ่ายที่หนี้หยุดลดในเดือนนั้น — เป็นขีดจำกัด ไม่ใช่เป้า
+      </div>
+      <div className="text-xs text-subtle mt-1">
+        นี่คือการฉายภาพจากตัวเลขที่คุณกรอกเอง ไม่ใช่คำแนะนำทางการเงินหรือการลงทุน
       </div>
     </div>
   );

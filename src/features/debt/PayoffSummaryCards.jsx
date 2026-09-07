@@ -1,7 +1,26 @@
 import React from 'react';
 import { StatCard } from '../../components/StatCard';
 import { formatCurrency, formatMonthLabel } from '../../shared/formatters';
+import { outstandingBalance, periodsRemaining } from './engine/debtMath';
 import { CalendarCheck, Coins, TrendingDown, AlertTriangle } from 'lucide-react';
+
+/**
+ * Balance still owed on the fixed-schedule debts (hirePurchase, installment)
+ * as of a given 0-based month index into the projection.
+ *
+ * The engine never tracks a declining balance for these — it only knows the
+ * flat monthly payment and how many of the plan's periods are still ahead of
+ * `startMonth` (see payoffSimulator's fixedObligations). So the balance as of
+ * month `atIndex` is what is left after `atIndex + 1` payments have been made:
+ * monthlyPayment x periods still owed beyond this month.
+ */
+const stillRunningFixedBalance = (debts, atIndex) =>
+  (debts || [])
+    .filter((d) => d.type === 'hirePurchase' || d.type === 'installment')
+    .reduce((sum, d) => {
+      const remaining = Math.max(0, periodsRemaining(d) - (atIndex + 1));
+      return sum + (Number(d.monthlyPayment) || 0) * remaining;
+    }, 0);
 
 /**
  * Summary cards, the infeasible banner, and the assumptions box.
@@ -10,18 +29,28 @@ import { CalendarCheck, Coins, TrendingDown, AlertTriangle } from 'lucide-react'
  * projection rests on user-entered numbers, so if the food budget is a guess,
  * the payoff date is a guess.
  */
-export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => {
+export const PayoffSummaryCards = ({ projection, budgetProfile, debts }) => {
+  const openDebts = debts || [];
   const last = projection.Months.length
     ? projection.Months[projection.Months.length - 1]
     : null;
 
+  // Card 4, IsInfeasible variant: the amortizing balances the engine tracked
+  // plus whatever is still owed on installment/hire-purchase plans that are
+  // still running at the month the simulation stopped. Reporting the
+  // amortizing figure alone under-reports real debt for any portfolio that
+  // also carries a hire-purchase or an installment plan.
   const debtRemaining = last
-    ? last.PrincipalBalance + last.AccruedInterestBalance
+    ? last.PrincipalBalance +
+      last.AccruedInterestBalance +
+      stillRunningFixedBalance(openDebts, last.Index)
     : 0;
 
-  const startingDebt = projection.Months.length
-    ? projection.Months[0].PrincipalBalance + projection.Months[0].AccruedInterestBalance
-    : 0;
+  // Card 4, feasible variant: the true starting balance across every open
+  // debt, using the same product-rule math the engine and the debt list use
+  // (outstandingBalance never applies an interest formula to hirePurchase or
+  // installment).
+  const startingDebt = openDebts.reduce((sum, d) => sum + outstandingBalance(d), 0);
 
   return (
     <>
@@ -66,7 +95,7 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => 
           value={formatCurrency(
             Math.round(projection.IsInfeasible ? debtRemaining : startingDebt)
           )}
-          subtext={`${debtCount} รายการในแผน`}
+          subtext={`${openDebts.length} รายการในแผน`}
           icon={AlertTriangle}
           colorScheme="rose"
           valueClass="text-danger"
@@ -82,12 +111,32 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debtCount }) => 
             🔴 งบปัจจุบันยังปิดหนี้ไม่ได้
           </div>
           <p className="text-xs text-main mt-1">
-            เงินที่เหลือไปชำระหนี้น้อยกว่าดอกเบี้ยที่เดินในแต่ละเดือน หนี้จึงไม่ลดลง
-            ต้องมีเงินเข้าชำระหนี้อย่างน้อย{' '}
-            <b className="num-font">
-              {formatCurrency(Math.round(projection.MinimumViablePayment || 0))}
-            </b>{' '}
-            ต่อเดือน หนี้จึงจะเริ่มลด — ลดงบกินใช้ หรือเพิ่มรายได้เสริม
+            {projection.InfeasibleReason === 'budgetShortfall' && (
+              <>
+                ค่าใช้จ่ายคงที่ งบกินใช้ และค่างวดผ่อนของเดือนนี้รวมกันมากกว่ารายได้ที่มี
+                เงินจึงไม่เหลือไปถึงหนี้เลยแม้แต่บาทเดียว ต้องหาเงินเพิ่มอีกอย่างน้อย{' '}
+                <b className="num-font">
+                  {formatCurrency(Math.round(projection.MonthlyShortfall))}
+                </b>{' '}
+                ต่อเดือน หรือลดค่าใช้จ่ายลงให้พอ ก่อนจะเริ่มโปะหนี้ได้
+              </>
+            )}
+            {projection.InfeasibleReason === 'debtNotFalling' && (
+              <>
+                เงินที่เหลือไปชำระหนี้น้อยกว่าดอกเบี้ยที่เดินในแต่ละเดือน หนี้จึงไม่ลดลง
+                ต้องมีเงินเข้าชำระหนี้อย่างน้อย{' '}
+                <b className="num-font">
+                  {formatCurrency(Math.round(projection.MinimumViablePayment))}
+                </b>{' '}
+                ต่อเดือน หนี้จึงจะเริ่มลด — ลดงบกินใช้ หรือเพิ่มรายได้เสริม
+              </>
+            )}
+            {projection.InfeasibleReason === 'horizonExhausted' && (
+              <>
+                ด้วยตัวเลขงบประมาณปัจจุบัน แผนนี้ยังปิดหนี้ไม่จบภายใน 50 ปีที่ระบบคำนวณให้
+                ต้องลดงบกินใช้หรือเพิ่มรายได้เสริมให้มากขึ้นกว่านี้
+              </>
+            )}
           </p>
         </div>
       )}

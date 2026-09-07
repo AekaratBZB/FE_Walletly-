@@ -58,7 +58,10 @@ export const useDebtState = ({
 
   const saveDebt = (debt) => {
     if (debt.id && debts.some((d) => d.id === debt.id)) {
-      setDebts((prev) => prev.map((d) => (d.id === debt.id ? { ...d, ...debt } : d)));
+      // Replace rather than merge. The modal submits a complete record for the
+      // chosen type, so merging would preserve fields belonging to the type the
+      // debt used to be.
+      setDebts((prev) => prev.map((d) => (d.id === debt.id ? debt : d)));
       addToast(`แก้ไขหนี้ "${debt.name}" เรียบร้อยแล้ว`, 'success');
     } else {
       const created = { ...debt, id: debt.id || `debt-${Date.now()}`, isClosed: false };

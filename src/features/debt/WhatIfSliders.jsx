@@ -45,7 +45,13 @@ export const WhatIfSliders = ({ budgetProfile, overrides, onChange }) => {
       : overrides.extraIncome;
 
   const income = Number(budgetProfile.netMonthlyIncome) || 0;
-  const discretionaryMax = Math.max(20000, Math.ceil(income / 1000) * 1000);
+  // The max must accommodate the current value, or a saved budget above it
+  // renders the thumb pinned at the end while the label shows the real figure.
+  const discretionaryMax = Math.max(
+    20000,
+    Math.ceil(income / 1000) * 1000,
+    Math.ceil(discretionary / 1000) * 1000
+  );
 
   const isDirty =
     overrides.discretionaryBudget !== null || overrides.extraIncome !== null;

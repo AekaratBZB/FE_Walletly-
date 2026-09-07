@@ -1,6 +1,6 @@
 import React from 'react';
 import { useWallet } from '../../context/WalletContext';
-import { Wallet, Plus, Trash2 } from 'lucide-react';
+import { Wallet, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 
 const NumberField = ({ label, hint, value, onChange }) => (
   <div className="form-group">
@@ -80,8 +80,90 @@ const ScheduleEditor = ({ label, overrides, onChange }) => {
   );
 };
 
+/**
+ * Order editor for the manual strategy.
+ *
+ * Only `amortizing` debts can receive attack money — the engine pays fixed
+ * obligations on their own schedule — so only they are orderable. The list is
+ * always seeded from the current debts, so selecting Manual never shows a blank
+ * panel and a debt added later cannot silently fall off the end of the order.
+ */
+const ManualOrderEditor = ({ debts, manualOrder, onChange }) => {
+  const orderable = (debts || []).filter((d) => !d.isClosed && d.type === 'amortizing');
+
+  if (!orderable.length) {
+    return (
+      <div className="text-xs text-subtle mb-2">
+        ยังไม่มีหนี้ที่คิดดอกเบี้ยให้จัดลำดับ — โหมดนี้จัดลำดับได้เฉพาะหนี้แบบลดต้นลดดอก
+        เพราะหนี้ผ่อนกับเช่าซื้อจ่ายตามงวดในสัญญาอยู่แล้ว
+      </div>
+    );
+  }
+
+  // Ids the user has ordered, minus any that no longer exist, plus any debt
+  // they have not placed yet — appended in the order the debts were added.
+  const ordered = (manualOrder || []).filter((id) => orderable.some((d) => d.id === id));
+  const effective = [
+    ...ordered,
+    ...orderable.filter((d) => !ordered.includes(d.id)).map((d) => d.id)
+  ];
+
+  const nameOf = (id) => orderable.find((d) => d.id === id);
+
+  const move = (index, delta) => {
+    const next = [...effective];
+    const target = index + delta;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange(next);
+  };
+
+  return (
+    <div className="form-group">
+      <label className="form-label">ลำดับที่จะโปะ (บนสุดได้เงินก่อน)</label>
+
+      {effective.map((id, i) => {
+        const debt = nameOf(id);
+        return (
+          <div key={id} className="flex gap-2 items-center mb-1">
+            <span className="text-xs text-muted num-font" style={{ width: '18px' }}>
+              {i + 1}.
+            </span>
+            <span className="text-xs text-main flex-1">
+              {debt.name}{' '}
+              <span className="text-muted num-font">{debt.annualRatePct}% ต่อปี</span>
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              title="เลื่อนขึ้น"
+              disabled={i === 0}
+              onClick={() => move(i, -1)}
+            >
+              <ChevronUp size={14} />
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              title="เลื่อนลง"
+              disabled={i === effective.length - 1}
+              onClick={() => move(i, 1)}
+            >
+              <ChevronDown size={14} />
+            </button>
+          </div>
+        );
+      })}
+
+      <div className="text-xs text-subtle mt-1">
+        เงินที่เหลือหลังจ่ายขั้นต่ำทุกก้อนจะทุ่มลงก้อนบนสุดก่อน แล้วไล่ลงมา
+      </div>
+    </div>
+  );
+};
+
 export const BudgetProfilePanel = () => {
-  const { budgetProfile, updateBudgetProfile } = useWallet();
+  const { budgetProfile, updateBudgetProfile, debts } = useWallet();
   const p = budgetProfile;
   const set = (key) => (value) => updateBudgetProfile({ [key]: value });
 
@@ -180,6 +262,14 @@ export const BudgetProfilePanel = () => {
           <option value="manual">Manual — เรียงลำดับเอง</option>
         </select>
       </div>
+
+      {p.strategy === 'manual' && (
+        <ManualOrderEditor
+          debts={debts}
+          manualOrder={p.manualOrder}
+          onChange={(v) => updateBudgetProfile({ manualOrder: v })}
+        />
+      )}
     </div>
   );
 };

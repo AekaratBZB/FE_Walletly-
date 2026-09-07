@@ -531,9 +531,20 @@ Per month:
 availableBeforeDiscretionary = income + extraIncome - fixedExpenses
                              - installmentTotal
 discretionaryCeiling         = availableBeforeDiscretionary
-                             - monthlyInterestThreshold
+                             - interestAccrued(this month)
 breathingRoom                = discretionaryCeiling - discretionaryBudget
 ```
+
+**Why this month's `interestAccrued` rather than the `MonthlyInterestThreshold`
+scalar.** The source spec's formula subtracts the threshold, which is fixed at
+month 0. But the threshold is `principal x rate / 12` on the *opening*
+principal, and the ceiling is a per-month answer to "what can I spend this
+month before the debt stops shrinking". Once the principal has fallen, the
+month-0 figure overstates the interest actually accruing and the ceiling reads
+lower than it truly is. Using the row's own `interestAccrued` makes each
+month's figure correct for that month, and the two agree exactly at month 0.
+`MonthlyInterestThreshold` remains a first-class output for the summary card —
+the two are different questions, not two answers to one.
 
 `discretionaryCeiling` is the spend level at which the debt stops shrinking. It
 is **a limit, not a target**, and is labelled that way in the UI

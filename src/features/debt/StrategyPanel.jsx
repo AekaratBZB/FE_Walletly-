@@ -10,6 +10,72 @@ const TYPE_LABEL = {
   installment: 'ผ่อน 0%'
 };
 
+const STRATEGY_LABEL = {
+  avalanche: 'Avalanche',
+  snowball: 'Snowball'
+};
+
+/**
+ * Builds the Thai copy for the avalanche-vs-snowball comparison. Both
+ * comparisons can point the same way, opposite ways, or tie — the copy must
+ * name whichever strategy actually wins each measure rather than assuming
+ * avalanche always does.
+ */
+const buildComparisonCopy = ({ interestDelta, monthsDelta }) => {
+  // interestDelta = snowball interest - avalanche interest.
+  //   > 0  => snowball costs more  => avalanche is cheaper
+  //   < 0  => snowball costs less  => snowball is cheaper
+  const cheaper = interestDelta > 0 ? 'avalanche' : interestDelta < 0 ? 'snowball' : null;
+  // monthsDelta = snowball months - avalanche months.
+  //   > 0  => snowball takes longer => avalanche is faster
+  //   < 0  => avalanche takes longer => snowball is faster
+  const faster = monthsDelta > 0 ? 'avalanche' : monthsDelta < 0 ? 'snowball' : null;
+
+  const interestAmount = formatCurrency(Math.round(Math.abs(interestDelta)));
+  const monthsAmount = Math.abs(monthsDelta);
+
+  if (!cheaper && !faster) {
+    return 'สองวิธีให้ผลลัพธ์เหมือนกันทุกประการสำหรับหนี้ชุดนี้';
+  }
+
+  if (cheaper && !faster) {
+    return (
+      <>
+        {STRATEGY_LABEL[cheaper]} ประหยัดดอกเบี้ยกว่า{' '}
+        <b className="num-font">{interestAmount}</b> ใช้เวลาปลอดหนี้เท่ากัน
+      </>
+    );
+  }
+
+  if (!cheaper && faster) {
+    return (
+      <>
+        {STRATEGY_LABEL[faster]} ปลอดหนี้เร็วกว่า{' '}
+        <b className="num-font">{monthsAmount}</b> เดือน ดอกเบี้ยรวมเท่ากัน
+      </>
+    );
+  }
+
+  if (cheaper === faster) {
+    return (
+      <>
+        {STRATEGY_LABEL[cheaper]} ประหยัดดอกเบี้ยกว่า{' '}
+        <b className="num-font">{interestAmount}</b> และปลอดหนี้เร็วกว่า{' '}
+        <b className="num-font">{monthsAmount}</b> เดือน
+      </>
+    );
+  }
+
+  // Trade-off: one strategy is cheaper, the other finishes sooner.
+  return (
+    <>
+      {STRATEGY_LABEL[cheaper]} ประหยัดดอกเบี้ยกว่า{' '}
+      <b className="num-font">{interestAmount}</b> แต่ {STRATEGY_LABEL[faster]} ปลอดหนี้เร็วกว่า{' '}
+      <b className="num-font">{monthsAmount}</b> เดือน
+    </>
+  );
+};
+
 /**
  * Ranked payoff order plus a like-for-like avalanche vs snowball comparison.
  * The engine is pure, so running it twice to show the difference costs nothing.
@@ -34,6 +100,7 @@ export const StrategyPanel = ({ debts, budgetProfile, startMonth }) => {
     return {
       avalanche,
       snowball,
+      bothFeasible: !avalanche.IsInfeasible && !snowball.IsInfeasible,
       interestDelta: snowball.TotalInterestPaid - avalanche.TotalInterestPaid,
       monthsDelta: snowball.MonthsToPayoff - avalanche.MonthsToPayoff
     };
@@ -44,6 +111,8 @@ export const StrategyPanel = ({ debts, budgetProfile, startMonth }) => {
   const interestBearingCount = debts.filter(
     (d) => !d.isClosed && d.type === 'amortizing'
   ).length;
+
+  const rankingUnreliable = ranked.some((r) => r.rankingUnreliable);
 
   return (
     <div className="card">
@@ -58,6 +127,14 @@ export const StrategyPanel = ({ debts, budgetProfile, startMonth }) => {
           </div>
         </div>
       </div>
+
+      {rankingUnreliable && (
+        <div className="text-xs text-warning mb-2">
+          <AlertCircle size={12} style={{ verticalAlign: '-2px' }} />{' '}
+          ลำดับนี้ยังเชื่อถือไม่ได้เต็มที่ เพราะแผนปัจจุบันยังปิดหนี้ไม่ได้
+          ตัวเลขต้นทุนของหนี้บางก้อนจึงยังคำนวณไม่ได้
+        </div>
+      )}
 
       <div className="table-container">
         <table className="custom-table">
@@ -91,7 +168,9 @@ export const StrategyPanel = ({ debts, budgetProfile, startMonth }) => {
                   </div>
                 </td>
                 <td className="text-right num-font font-bold text-sm">
-                  {r.quoteMissing ? '—' : formatCurrency(Math.round(r.totalRemainingCost))}
+                  {r.quoteMissing || r.totalRemainingCost === null
+                    ? '—'
+                    : formatCurrency(Math.round(r.totalRemainingCost))}
                 </td>
               </tr>
             ))}
@@ -111,37 +190,41 @@ export const StrategyPanel = ({ debts, budgetProfile, startMonth }) => {
           <div className="text-xs font-semibold text-muted mb-2">
             เทียบสองวิธีด้วยตัวเลขของคุณเอง
           </div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <div className="text-muted">Avalanche (ดอกแพงสุดก่อน)</div>
-              <div className="font-bold num-font text-success">
-                {comparison.avalanche.MonthsToPayoff} เดือน ·{' '}
-                {formatCurrency(Math.round(comparison.avalanche.TotalInterestPaid))}
+
+          {comparison.bothFeasible ? (
+            <>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <div className="text-muted">Avalanche (ดอกแพงสุดก่อน)</div>
+                  <div className="font-bold num-font text-success">
+                    {comparison.avalanche.MonthsToPayoff} เดือน ·{' '}
+                    {formatCurrency(Math.round(comparison.avalanche.TotalInterestPaid))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted">Snowball (ยอดน้อยสุดก่อน)</div>
+                  <div className="font-bold num-font text-warning">
+                    {comparison.snowball.MonthsToPayoff} เดือน ·{' '}
+                    {formatCurrency(Math.round(comparison.snowball.TotalInterestPaid))}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div>
-              <div className="text-muted">Snowball (ยอดน้อยสุดก่อน)</div>
-              <div className="font-bold num-font text-warning">
-                {comparison.snowball.MonthsToPayoff} เดือน ·{' '}
-                {formatCurrency(Math.round(comparison.snowball.TotalInterestPaid))}
+              <div className="text-xs text-main mt-2">
+                {buildComparisonCopy(comparison)}
               </div>
+            </>
+          ) : (
+            <div className="text-xs text-muted">
+              ยังเทียบสองวิธีไม่ได้ เพราะงบปัจจุบันยังปิดหนี้ไม่ได้ในอย่างน้อยหนึ่งวิธี
+              ตัวเลขจึงยังไม่นิ่งพอจะเทียบกัน
             </div>
-          </div>
-          <div className="text-xs text-main mt-2">
-            Avalanche ประหยัดดอกเบี้ยกว่า{' '}
-            <b className="num-font">
-              {formatCurrency(Math.round(Math.abs(comparison.interestDelta)))}
-            </b>
-            {comparison.monthsDelta !== 0 && (
-              <>
-                {' '}
-                และปลอดหนี้เร็วกว่า{' '}
-                <b className="num-font">{Math.abs(comparison.monthsDelta)}</b> เดือน
-              </>
-            )}
-          </div>
+          )}
         </div>
       )}
+
+      <div className="text-xs text-subtle mt-2">
+        นี่คือการฉายภาพจากตัวเลขที่คุณกรอกเอง ไม่ใช่คำแนะนำทางการเงินหรือการลงทุน
+      </div>
     </div>
   );
 };

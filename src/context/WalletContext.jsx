@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { DEMO_DATA } from '../shared/demoData';
 import { useDebtState } from '../features/debt/useDebtState';
-import { DEFAULT_BUDGET_PROFILE } from '../features/debt/debtStorage';
+import { DEFAULT_BUDGET_PROFILE, buildPrefillProfile } from '../features/debt/debtStorage';
 
 const STORAGE_KEYS = {
   TRANSACTIONS: 'finsmart_transactions_v1',
@@ -249,7 +249,12 @@ export const WalletProvider = ({ children }) => {
       if (data.savingsGoals) setSavingsGoals(data.savingsGoals);
       if (data.taxSettings) setTaxSettings(data.taxSettings);
       if (data.debts) debt.setDebts(data.debts);
-      if (data.budgetProfile) debt.setBudgetProfile(data.budgetProfile);
+      // Merge over the defaults the same way loadBudgetProfile does, so a
+      // backup written by an older version cannot put undefined into a
+      // controlled input and flip it to uncontrolled.
+      if (data.budgetProfile) {
+        debt.setBudgetProfile({ ...DEFAULT_BUDGET_PROFILE, ...data.budgetProfile });
+      }
       addToast('นำเข้าข้อมูลสำเร็จเรียบร้อยแล้ว!', 'success');
       return { success: true };
     } catch (e) {
@@ -291,7 +296,18 @@ export const WalletProvider = ({ children }) => {
     setSavingsGoals(DEMO_DATA.savingsGoals);
     setTaxSettings(DEMO_DATA.taxSettings);
     debt.setDebts([]);
-    debt.setBudgetProfile(DEFAULT_BUDGET_PROFILE);
+    // Prefill from the demo data rather than zeroing, so loading the demo
+    // leaves the debt tab with figures like every other tab. Debts themselves
+    // stay empty — a fixed cost carries no rate, principal or period count,
+    // and inventing those is exactly what this feature must not do.
+    debt.setBudgetProfile(
+      buildPrefillProfile({
+        allocationSettings: DEMO_DATA.allocationSettings,
+        fixedCosts: DEMO_DATA.fixedCosts,
+        savingsGoals: DEMO_DATA.savingsGoals,
+        transactions: DEMO_DATA.transactions
+      })
+    );
     addToast('โหลดข้อมูลตัวอย่าง (Demo Data) สำเร็จแล้ว!', 'success');
   };
 

@@ -42,10 +42,55 @@ export const AddDebtModal = () => {
   const setMin = (patch) =>
     setForm((prev) => ({ ...prev, minimumPayment: { ...prev.minimumPayment, ...patch } }));
 
+  /**
+   * The form holds one flat object covering all three types, so switching type
+   * mid-edit leaves the other type's fields populated. Nothing in the engine
+   * reads them — it partitions on `type` alone — but a stale `monthlyPayment`
+   * on an amortizing debt would show a figure in the list's "ค่างวด/เดือน"
+   * column that no calculation ever uses. Keep only the fields the chosen type
+   * actually owns.
+   */
+  const normalise = (d) => {
+    const base = {
+      id: d.id,
+      name: d.name.trim(),
+      type: d.type,
+      isClosed: Boolean(d.isClosed)
+    };
+
+    if (d.type === 'amortizing') {
+      return {
+        ...base,
+        principal: d.principal,
+        accruedInterest: d.accruedInterest,
+        annualRatePct: d.annualRatePct,
+        frequency: d.frequency,
+        annualDueMonth: d.acceptsEarlyPayment ? null : d.annualDueMonth,
+        acceptsEarlyPayment: d.acceptsEarlyPayment,
+        minimumPayment: d.minimumPayment
+      };
+    }
+
+    const fixed = {
+      ...base,
+      monthlyPayment: d.monthlyPayment,
+      periodsPaid: d.periodsPaid,
+      periodsTotal: d.periodsTotal
+    };
+
+    return d.type === 'hirePurchase'
+      ? {
+          ...fixed,
+          settlementQuote: d.settlementQuote,
+          settlementQuoteDate: d.settlementQuoteDate
+        }
+      : fixed;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.name.trim()) return;
-    saveDebt({ ...form, name: form.name.trim() });
+    saveDebt(normalise(form));
   };
 
   const isAmortizing = form.type === 'amortizing';

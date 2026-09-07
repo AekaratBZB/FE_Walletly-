@@ -124,6 +124,10 @@ export const CeilingPanel = ({ projection, budgetProfile }) => {
       <div style={{ height: '300px' }}>
         <Bar data={data} options={options} />
       </div>
+
+      <div className="text-xs text-subtle mt-2">
+        นี่คือการฉายภาพจากตัวเลขที่คุณกรอกเอง ไม่ใช่คำแนะนำทางการเงินหรือการลงทุน
+      </div>
     </div>
   );
 };

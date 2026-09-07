@@ -64,7 +64,7 @@ export const DebtTab = () => {
       <PayoffSummaryCards
         projection={projection}
         budgetProfile={deferredBudget}
-        debtCount={openDebts.length}
+        debts={openDebts}
       />
 
       <div className="grid grid-cols-3 gap-6 mb-4">
