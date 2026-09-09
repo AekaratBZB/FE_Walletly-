@@ -32,59 +32,64 @@ export const CookieConsentBanner = () => {
   return (
     <div className="cookie-banner-wrapper" role="region" aria-label="Cookie Consent Banner">
       <div className="cookie-banner-card">
+        {/* Top Header with Icon, Title, and Close Button */}
         <div className="cookie-banner-header">
-          <div className="cookie-icon-wrapper" aria-hidden="true">
-            🍪
+          <div className="cookie-banner-header-left">
+            <span className="cookie-icon-mini" aria-hidden="true">🍪</span>
+            <h4 className="cookie-banner-title">การใช้งานคุกกี้ & ความเป็นส่วนตัว</h4>
           </div>
-          <div className="cookie-banner-text">
-            <h4 className="cookie-banner-title">
-              เราใช้คุกกี้เพื่อยกระดับประสบการณ์การเงินของคุณ
-            </h4>
-            <p className="cookie-banner-desc">
-              Future Wallet ให้ความสำคัญกับข้อมูลส่วนบุคคลของคุณตาม{' '}
-              <strong>พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล (PDPA)</strong>{' '}
-              เราใช้คุกกี้ที่จำเป็นเพื่อความปลอดภัยและการทำงานของระบบ และคุกกี้เสริมเพื่อพัฒนาบริการให้ดียิ่งขึ้น คุณสามารถเลือกปรับแต่งความยินยอมได้ตามต้องการ หรืออ่าน{' '}
-              <button
-                type="button"
-                className="cookie-policy-link"
-                onClick={() => setIsPolicyOpen(true)}
-              >
-                นโยบายความเป็นส่วนตัว & คุกกี้
-              </button>
-            </p>
-          </div>
-        </div>
-
-        <div className="cookie-banner-actions">
-          {/* Settings Button */}
           <button
             type="button"
-            className="cookie-btn cookie-btn-ghost"
-            onClick={() => setIsPreferencesOpen(true)}
-          >
-            <Settings size={15} />
-            <span>ตั้งค่าคุกกี้ (Settings)</span>
-          </button>
-
-          {/* Reject Non-Essential Button */}
-          <button
-            type="button"
-            className="cookie-btn cookie-btn-secondary"
+            className="cookie-banner-close-btn"
             onClick={handleRejectNonEssential}
+            title="ปฏิเสธคุกกี้ที่ไม่จำเป็นและปิด"
+            aria-label="ปิด"
           >
             <X size={15} />
-            <span>ปฏิเสธคุกกี้ที่ไม่จำเป็น</span>
           </button>
+        </div>
 
-          {/* Accept All Button */}
+        {/* Concise Description */}
+        <p className="cookie-banner-desc">
+          เราใช้คุกกี้ที่จำเป็นเพื่อความปลอดภัยและการทำงานของระบบ คุณสามารถอ่าน{' '}
           <button
             type="button"
-            className="cookie-btn cookie-btn-primary"
-            onClick={handleAcceptAll}
+            className="cookie-policy-link"
+            onClick={() => setIsPolicyOpen(true)}
           >
-            <Check size={16} />
-            <span>ยอมรับทั้งหมด (Accept All)</span>
+            นโยบายความเป็นส่วนตัว
+          </button>{' '}
+          หรือเลือกปรับแต่งความยินยอมได้
+        </p>
+
+        {/* Compact Actions Row */}
+        <div className="cookie-banner-actions">
+          <button
+            type="button"
+            className="cookie-btn-ghost-sm"
+            onClick={() => setIsPreferencesOpen(true)}
+          >
+            <Settings size={13} />
+            <span>ตั้งค่า</span>
           </button>
+
+          <div className="cookie-banner-actions-right">
+            <button
+              type="button"
+              className="cookie-btn cookie-btn-secondary-sm"
+              onClick={handleRejectNonEssential}
+            >
+              ปฏิเสธ
+            </button>
+            <button
+              type="button"
+              className="cookie-btn cookie-btn-primary-sm"
+              onClick={handleAcceptAll}
+            >
+              <Check size={14} />
+              <span>ยอมรับทั้งหมด</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
