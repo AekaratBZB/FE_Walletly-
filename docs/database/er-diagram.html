@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Walletly - Interactive Database Architecture Explorer</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Modular Stylesheet -->
+  <link rel="stylesheet" href="./viewer/style.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">💰</div>
+      <div class="brand-title">
+        <h1>Walletly — แผนผังฐานข้อมูล 21 ตาราง</h1>
+        <p>Database Architecture & Dropdown Explorer</p>
+      </div>
+    </div>
+
+    <!-- View Mode Switcher -->
+    <div class="view-mode-tabs">
+      <button class="tab-btn active" id="tab-dropdown-mode" onclick="switchView('dropdown')">
+        <span>🎯</span> โหมดเลือกดูผ่าน Dropdown (แนะนำ - สบายตา)
+      </button>
+      <button class="tab-btn" id="tab-canvas-mode" onclick="switchView('canvas')">
+        <span>🗺️</span> แผนผังภาพรวม 21 ตาราง (Drag & Pan ได้อิสระ)
+      </button>
+    </div>
+
+    <!-- Global Actions -->
+    <div class="header-actions">
+      <button class="btn" onclick="toggleFullscreen()" title="เปิด/ปิดโหมดเต็มหน้าจอ">
+        <span id="fs-icon">🖥️</span> เต็มจอ
+      </button>
+      <button class="btn btn-primary" onclick="toggleInspector()" title="เปิดดูพจนานุกรมตาราง">
+        <span>📦</span> พจนานุกรมตาราง
+      </button>
+    </div>
+  </header>
+
+  <!-- Filter & Dropdown Toolbar -->
+  <div class="filter-bar">
+    <!-- Domain Selector -->
+    <div class="dropdown-wrapper">
+      <label class="dropdown-label" for="domain-select">
+        <span>📂</span> <b>เลือกกลุ่มระบบงาน:</b>
+      </label>
+      <select class="custom-select" id="domain-select" onchange="onDomainChange(this.value)">
+        <option value="core">💳 1. บัญชี, กระเป๋า & ธุรกรรมหลัก (Core Ledger)</option>
+        <option value="fixed">🗓️ 2. ค่าใช้จ่ายประจำ & ประวัติบิล (Fixed Costs)</option>
+        <option value="debt">📉 3. แผนปลดหนี้อัจฉริยะ 3 รูปแบบ (Debt Planner)</option>
+        <option value="goals">🎯 4. เป้าหมายเงินออม & สำรองฉุกเฉิน (Savings Goals)</option>
+        <option value="budget">🥧 5. สัดส่วนงบประมาณ 50/30/20 & 6 Jars (Buckets)</option>
+        <option value="tax">🧾 6. วางแผนภาษี ภ.ง.ด. 90/91 ปี 2026 (Thai Tax)</option>
+        <option value="sim">🔮 7. จำลองสภาพคล่องการซื้อของ (Affordability)</option>
+        <option value="auth">👤 8. สมาชิก, เซสชัน & ความยินยอม PDPA (Auth)</option>
+        <option value="security">🛡️ 9. สำรองข้อมูล & Audit ความปลอดภัย (Security)</option>
+        <option value="all">🌟 แสดงภาพรวมทั้ง 21 ตาราง (Full Architecture)</option>
+      </select>
+    </div>
+
+    <!-- Direct Table Quick Jump -->
+    <div class="dropdown-wrapper">
+      <label class="dropdown-label" for="table-select">
+        <span>🎯</span> <b>เจาะลึกเฉพาะตาราง:</b>
+      </label>
+      <select class="custom-select" id="table-select" onchange="onTableSelect(this.value)">
+        <option value="">-- คลิกเลือกตารางเพื่อดูโครงสร้างทันที --</option>
+        <optgroup label="1. Core Ledger & Accounts">
+          <option value="transactions">💸 transactions (ธุรกรรมหลักเข้า-ออก)</option>
+          <option value="accounts">🏦 accounts (กระเป๋าเงิน/บัญชีธนาคาร)</option>
+          <option value="categories">🏷️ categories (หมวดหมู่รายรับ-รายจ่าย)</option>
+          <option value="payment_methods">💳 payment_methods (ช่องทางชำระเงิน)</option>
+        </optgroup>
+        <optgroup label="2. Fixed Costs & Bills">
+          <option value="fixed_costs">🗓️ fixed_costs (ภาระค่าใช้จ่ายคงที่รายเดือน)</option>
+          <option value="fixed_cost_payments">🧾 fixed_cost_payments (ประวัติการจ่ายบิล)</option>
+        </optgroup>
+        <optgroup label="3. Debt Planner (Thai Rules)">
+          <option value="debts">📉 debts (หนี้สิน: ลดต้นลดดอก, เช่าซื้อ, ผ่อน 0%)</option>
+          <option value="debt_budget_profiles">📊 debt_budget_profiles (โปรไฟล์กระแสเงินสดปลดหนี้)</option>
+          <option value="debt_schedule_overrides">⏱️ debt_schedule_overrides (ปรับงบสำรองตามช่วงเวลา)</option>
+        </optgroup>
+        <optgroup label="4. Savings Goals">
+          <option value="savings_goals">🎯 savings_goals (เป้าหมายเงินออม/ฉุกเฉิน)</option>
+        </optgroup>
+        <optgroup label="5. Budget Buckets">
+          <option value="allocation_settings">🥧 allocation_settings (สูตรจัดสรร 50/30/20)</option>
+          <option value="allocation_buckets">🪣 allocation_buckets (ถังงบประมาณย่อย)</option>
+          <option value="allocation_bucket_categories">🔗 bucket_categories (ผูกหมวดหมู่งบ)</option>
+        </optgroup>
+        <optgroup label="6. Thai Tax 2026">
+          <option value="tax_settings">🧾 tax_settings (วางแผนภาษี ม.40(1) & ลดหย่อน)</option>
+          <option value="tax_bracket_rules">🏛️ tax_bracket_rules (อัตราภาษีก้าวหน้า 0-35%)</option>
+        </optgroup>
+        <optgroup label="7. Liquidity Simulation">
+          <option value="affordability_simulations">🔮 affordability_simulations (จำลองซื้อของ)</option>
+        </optgroup>
+        <optgroup label="8. Auth & Security">
+          <option value="users">👤 users (บัญชีผู้ใช้งาน)</option>
+          <option value="user_refresh_tokens">🔑 user_refresh_tokens (Token เซสชัน)</option>
+          <option value="user_consents">🛡️ user_consents (ความยินยอมตาม PDPA)</option>
+          <option value="user_backups">💾 user_backups (สำรองข้อมูล JSON/CSV)</option>
+          <option value="audit_logs">📋 audit_logs (Audit Trail ตรวจสอบความปลอดภัย)</option>
+        </optgroup>
+      </select>
+    </div>
+  </div>
+
+  <!-- Main Viewport Container -->
+  <div class="app-body">
+
+    <!-- ================= VIEW 1: DROPDOWN EXPLORER MODE ================= -->
+    <main class="dropdown-explorer-view" id="dropdown-view">
+      
+      <!-- Domain Summary Banner -->
+      <div class="domain-banner" id="domain-banner">
+        <div class="domain-info">
+          <h2 id="banner-title">💳 1. ระบบบัญชี, กระเป๋า & ธุรกรรมหลัก (Core Ledger)</h2>
+          <p id="banner-desc">ศูนย์กลางการบันทึกกระแสเงินสดเข้า-ออกของ Walletly เชื่อมโยงบัญชีธนาคาร, หมวดหมู่, ช่องทางการชำระเงิน พร้อมเชื่อมต่อไปยังเงินออมและภาระหนี้สิน</p>
+        </div>
+        <div class="domain-stats">
+          <div class="stat-pill">
+            <div class="num" id="stat-table-count">4</div>
+            <div class="lbl">ตารางในกลุ่ม</div>
+          </div>
+          <div class="stat-pill">
+            <div class="num" id="stat-fk-count">7</div>
+            <div class="lbl">จุดเชื่อม (FK)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Focused Sub-Diagram (Non-overlapping, crisp vector SVG) -->
+      <div class="subdiagram-box">
+        <div class="box-header">
+          <h3><span>📊</span> แผนผังความสัมพันธ์เฉพาะกลุ่ม (Focused Sub-Diagram)</h3>
+          <span style="font-size: 0.82rem; color: var(--text-muted);">💡 ตัวอักษรขนาดใหญ่ อ่านสบายตา คลิกที่กล่องตารางเพื่อดู Data Dictionary ทันที</span>
+        </div>
+        <div class="subdiagram-svg-wrap" id="subdiagram-wrap">
+          <!-- Rendered dynamically by domains.js -->
+        </div>
+      </div>
+
+      <!-- Detailed Table Specification Cards Grid -->
+      <div class="tables-grid" id="tables-grid-container">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+
+    </main>
+
+    <!-- ================= VIEW 2: FULL DIAGRAM CANVAS (DRAGGABLE & PAN) ================= -->
+    <div class="canvas-viewport" id="canvas-view">
+      <div class="canvas-drag-container" id="canvas-drag-container">
+        <div id="drag-stage-element">
+          <!-- Rendered dynamically by full-diagram.js -->
+        </div>
+
+        <!-- Floating Control Toolbar -->
+        <div class="canvas-controls-floating">
+          <button class="nav-btn" onclick="zoomIn()" title="ขยายแผนผัง">➕ ซูมเข้า</button>
+          <button class="nav-btn" onclick="zoomOut()" title="ย่อแผนผัง">➖ ซูมออก</button>
+          <span id="canvas-zoom-badge" style="font-weight: 700; color: #38BDF8; font-size: 0.82rem; min-width: 48px; text-align: center;">82%</span>
+          <button class="nav-btn" onclick="resetCanvasPosition()" title="จัดกึ่งกลางพอดีจอ">📐 จัดพอดีจอ</button>
+          <div class="pan-guide-badge">
+            <span>🖐️ <b>คลิกเมาส์ค้างแล้วลาก (Drag)</b> เพื่อเลื่อนดูรอบทิศทางได้อย่างอิสระ</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Slide-in Inspector Drawer Backdrop -->
+  <div class="inspector-backdrop" id="inspector-backdrop" onclick="closeInspector()"></div>
+
+  <!-- Slide-in Inspector Drawer -->
+  <aside class="inspector-panel" id="inspector-panel">
+    <div class="inspector-header">
+      <h2><span>📦</span> <span id="inspector-title">พจนานุกรมตาราง</span></h2>
+      <button class="close-btn" onclick="closeInspector()" title="ปิดแผง">✕</button>
+    </div>
+
+    <div class="inspector-body">
+      <div id="inspector-details">
+        <div class="badge-tag badge-core" id="inspector-badge" style="margin-bottom: 0.75rem; display: inline-block;">SCHEMA</div>
+        <div class="entity-desc" id="table-desc">
+          คลิกที่ตารางเพื่อดูรายชื่อคอลัมน์, Data Type, PK, FK
+        </div>
+
+        <div class="field-list" id="field-list-container">
+          <!-- Columns list dynamically inserted -->
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Modular Application Scripts -->
+  <script src="./viewer/schemas.js"></script>
+  <script src="./viewer/domains.js"></script>
+  <script src="./viewer/full-diagram.js"></script>
+  <script src="./viewer/app.js"></script>
+</body>
+</html>

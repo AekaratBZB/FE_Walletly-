@@ -3,6 +3,7 @@ import { useWallet } from '../../context/WalletContext';
 import { calculateThaiTax } from './taxCalculator';
 import { formatCurrency } from '../../shared/formatters';
 import { RotateCcw, Receipt } from 'lucide-react';
+import './tax.css';
 
 export const TaxTab = () => {
   const { taxSettings, updateTaxSettings, resetTaxSettings } = useWallet();

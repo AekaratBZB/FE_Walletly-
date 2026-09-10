@@ -4,26 +4,19 @@ import { useAuth } from './context/AuthContext';
 import { useCookieConsent } from './context/CookieContext';
 import { Navbar } from './components/Navbar';
 import { ToastContainer } from './components/Toast';
-import { AuthView } from './features/auth/AuthView';
-import { CookieConsentBanner } from './features/cookie/CookieConsentBanner';
-import { CookiePreferencesModal } from './features/cookie/CookiePreferencesModal';
-import { PrivacyPolicyModal } from './features/cookie/PrivacyPolicyModal';
+import { AuthView } from './features/auth';
+import { CookieConsentBanner, CookiePreferencesModal, PrivacyPolicyModal } from './features/cookie';
 
 // Feature Modules
-import { DashboardTab } from './features/dashboard/DashboardTab';
-import { TransactionsTab } from './features/transactions/TransactionsTab';
-import { AddTransactionModal } from './features/transactions/AddTransactionModal';
-import { FixedCostsTab } from './features/fixed-costs/FixedCostsTab';
-import { AddFixedCostModal } from './features/fixed-costs/AddFixedCostModal';
-import { ProjectionTab } from './features/projection/ProjectionTab';
-import { DebtTab } from './features/debt/DebtTab';
-import { AddDebtModal } from './features/debt/AddDebtModal';
-import { AllocationTab } from './features/allocation/AllocationTab';
-import { SavingsTab } from './features/savings/SavingsTab';
-import { AddGoalModal } from './features/savings/AddGoalModal';
-import { QuickDepositModal } from './features/savings/QuickDepositModal';
-import { TaxTab } from './features/tax/TaxTab';
-import { ReportsTab } from './features/reports/ReportsTab';
+import { DashboardTab } from './features/dashboard';
+import { TransactionsTab, AddTransactionModal } from './features/transactions';
+import { FixedCostsTab, AddFixedCostModal } from './features/fixed-costs';
+import { ProjectionTab } from './features/projection';
+import { DebtTab, AddDebtModal } from './features/debt';
+import { AllocationTab } from './features/allocation';
+import { SavingsTab, AddGoalModal, QuickDepositModal } from './features/savings';
+import { TaxTab } from './features/tax';
+import { ReportsTab } from './features/reports';
 
 export const App = () => {
   const { activeTab } = useWallet();
