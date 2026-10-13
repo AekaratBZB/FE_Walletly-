@@ -46,21 +46,20 @@ export const Navbar = () => {
               >
                 <path
                   d="M5 11.5L9.5 22.5L14 13.5L18.5 22.5L24.5 9"
-                  stroke="#10b981"
+                  stroke="currentColor"
                   strokeWidth="3.2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
                 <path
                   d="M19.5 9H24.5V14"
-                  stroke="#10b981"
+                  stroke="currentColor"
                   strokeWidth="3.2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
               </svg>
             </div>
-            <div className="brand-icon-glow" aria-hidden="true" />
           </div>
 
           <div className="brand-text-block">

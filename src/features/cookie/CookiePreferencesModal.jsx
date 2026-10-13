@@ -58,7 +58,7 @@ export const CookiePreferencesModal = () => {
         {/* Modal Header */}
         <div className="cookie-modal-header">
           <div className="cookie-modal-header-left">
-            <Settings size={20} color="#059669" />
+            <Settings size={20} color="var(--primary)" />
             <h3 id="cookie-modal-title">ศูนย์การตั้งค่าคุกกี้ (Cookie Preferences)</h3>
           </div>
           <button
@@ -81,7 +81,7 @@ export const CookiePreferencesModal = () => {
           <div className="cookie-category-item">
             <div className="cookie-category-header">
               <div className="cookie-category-title-wrap">
-                <Shield size={16} color="#059669" />
+                <Shield size={16} color="var(--primary)" />
                 <span className="cookie-category-title">1. คุกกี้ที่จำเป็นอย่างยิ่ง (Strictly Necessary)</span>
                 <span className="cookie-always-active-badge">เปิดใช้งานเสมอ (จำเป็น)</span>
               </div>

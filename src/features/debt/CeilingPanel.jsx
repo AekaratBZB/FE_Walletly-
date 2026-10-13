@@ -1,4 +1,5 @@
 import React from 'react';
+import { CHART_COLORS, withAlpha } from '../../shared/chartColors';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -46,15 +47,15 @@ export const CeilingPanel = ({ projection, budgetProfile }) => {
         type: 'bar',
         label: 'เพดานงบกินใช้ (ขีดจำกัด)',
         data: shown.map((m) => Math.round(m.DiscretionaryCeiling)),
-        backgroundColor: 'rgba(56, 189, 248, 0.45)',
-        borderColor: '#0ea5e9',
+        backgroundColor: withAlpha(CHART_COLORS.savings, 0.35),
+        borderColor: CHART_COLORS.savings,
         borderWidth: 1
       },
       {
         type: 'line',
         label: 'งบกินใช้ที่ตั้งไว้',
         data: shown.map(() => Math.round(budget)),
-        borderColor: '#f43f5e',
+        borderColor: CHART_COLORS.fixed,
         borderWidth: 2,
         borderDash: [6, 4],
         pointRadius: 0,

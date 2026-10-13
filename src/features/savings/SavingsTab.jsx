@@ -252,7 +252,7 @@ export const SavingsTab = () => {
               </button>
             </div>
 
-            <div className="p-3" style={{ background: 'var(--primary-light)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(5, 150, 105, 0.2)' }}>
+            <div className="p-3" style={{ background: 'var(--primary-light)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(244, 112, 11, 0.25)' }}>
               <div className="text-xs text-primary font-semibold">แนะนำ (6 เดือน) ⭐</div>
               <div className="num-font font-bold text-lg text-primary mt-1">{formatCurrency(Math.round(ef6))}</div>
               <button

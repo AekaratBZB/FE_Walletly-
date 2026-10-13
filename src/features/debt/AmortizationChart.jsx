@@ -1,4 +1,5 @@
 import React from 'react';
+import { CHART_COLORS, withAlpha } from '../../shared/chartColors';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -34,8 +35,8 @@ export const AmortizationChart = ({ projection }) => {
       {
         label: 'เงินต้นคงเหลือ',
         data: projection.Months.map((m) => Math.round(m.PrincipalBalance)),
-        borderColor: '#f43f5e',
-        backgroundColor: 'rgba(244, 63, 94, 0.12)',
+        borderColor: CHART_COLORS.expense,
+        backgroundColor: withAlpha(CHART_COLORS.expense, 0.1),
         fill: true,
         pointRadius: 0,
         borderWidth: 2,
@@ -44,8 +45,8 @@ export const AmortizationChart = ({ projection }) => {
       {
         label: 'ดอกเบี้ยค้างสะสม',
         data: projection.Months.map((m) => Math.round(m.AccruedInterestBalance)),
-        borderColor: '#f59e0b',
-        backgroundColor: 'rgba(245, 158, 11, 0.12)',
+        borderColor: CHART_COLORS.fixed,
+        backgroundColor: withAlpha(CHART_COLORS.fixed, 0.12),
         fill: true,
         pointRadius: 0,
         borderWidth: 2,
@@ -54,8 +55,8 @@ export const AmortizationChart = ({ projection }) => {
       {
         label: 'กองฉุกเฉิน',
         data: projection.Months.map((m) => Math.round(m.EmergencyFundBalance)),
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.10)',
+        borderColor: CHART_COLORS.income,
+        backgroundColor: withAlpha(CHART_COLORS.income, 0.1),
         fill: false,
         pointRadius: 0,
         borderWidth: 2,

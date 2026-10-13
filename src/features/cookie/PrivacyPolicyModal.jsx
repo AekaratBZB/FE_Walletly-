@@ -20,7 +20,7 @@ export const PrivacyPolicyModal = () => {
         {/* Header */}
         <div className="cookie-modal-header">
           <div className="cookie-modal-header-left">
-            <ShieldCheck size={22} color="#059669" />
+            <ShieldCheck size={22} color="var(--primary)" />
             <h3 id="privacy-modal-title">นโยบายความเป็นส่วนตัวและคุกกี้ (Privacy & Cookie Policy)</h3>
           </div>
           <button

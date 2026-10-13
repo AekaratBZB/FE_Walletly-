@@ -10,7 +10,9 @@ import {
   ArrowRight,
   PlusCircle,
   Sparkles,
-  CheckSquare
+  CheckSquare,
+  BarChart3,
+  ReceiptText
 } from 'lucide-react';
 
 export const DashboardTab = () => {
@@ -52,7 +54,10 @@ export const DashboardTab = () => {
       {/* Header & Quick Action Buttons */}
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <div>
-          <h2>📊 แดชบอร์ดภาพรวมการเงิน</h2>
+          <h2 className="flex items-center gap-2">
+            <BarChart3 size={22} color="var(--primary)" />
+            <span>แดชบอร์ดภาพรวมการเงิน</span>
+          </h2>
           <p>สรุปสถานะการเงิน กระแสเงินสด และภาระค่าใช้จ่ายประจำเดือนนี้</p>
         </div>
         <div className="flex gap-2">
@@ -99,7 +104,8 @@ export const DashboardTab = () => {
           subtext="รายรับ หัก รายจ่ายและเงินออม"
           icon={Banknote}
           colorScheme="blue"
-          valueClass={netRemaining >= 0 ? 'text-success' : 'text-danger'}
+          variant="dark"
+          valueClass={netRemaining >= 0 ? '' : 'text-danger'}
         />
 
         <StatCard
@@ -107,7 +113,7 @@ export const DashboardTab = () => {
           value={formatCurrency(totalFixedCosts)}
           subtext={fixedCosts.length === 0 ? 'ยังไม่มีฟิกคอส' : unpaidFixedCosts > 0 ? `รอจ่าย ${formatCurrency(unpaidFixedCosts)}` : '✓ จ่ายครบแล้ว'}
           icon={CalendarClock}
-          colorScheme="amber"
+          colorScheme="orange"
           valueClass="text-warning"
         />
       </div>
@@ -118,7 +124,10 @@ export const DashboardTab = () => {
         <div className="card" style={{ gridColumn: 'span 2' }}>
           <div className="card-header">
             <div>
-              <div className="card-title">📝 รายการล่าสุด</div>
+              <div className="card-title">
+                <ReceiptText size={18} color="var(--primary)" />
+                <span>รายการล่าสุด</span>
+              </div>
               <div className="card-subtitle">ธุรกรรมรายรับและรายจ่ายล่าสุดของคุณ</div>
             </div>
             <button
@@ -193,7 +202,7 @@ export const DashboardTab = () => {
           <div className="card-header">
             <div>
               <div className="card-title">
-                <CheckSquare size={18} />
+                <CheckSquare size={18} color="var(--primary)" />
                 <span>Checklist ฟิกคอส</span>
               </div>
               <div className="card-subtitle">รายการที่ต้องจ่ายในเดือนนี้</div>
