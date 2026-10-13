@@ -1,5 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { getSocialConfig } from '../socialConfig';
+import { getSocialConfig, getUsableProviders } from '../socialConfig';
+
+describe('getUsableProviders', () => {
+  const both = getSocialConfig({ VITE_GOOGLE_CLIENT_ID: 'g', VITE_FACEBOOK_APP_ID: 'f' });
+
+  it('shows every configured provider when nothing failed', () => {
+    expect(getUsableProviders(both, {})).toEqual({ google: true, facebook: true, any: true });
+  });
+
+  it('hides a provider whose script failed to load', () => {
+    expect(getUsableProviders(both, { facebook: true })).toEqual({ google: true, facebook: false, any: true });
+  });
+
+  it('reports none usable when every configured provider failed', () => {
+    expect(getUsableProviders(both, { google: true, facebook: true }).any).toBe(false);
+  });
+
+  it('never shows an unconfigured provider', () => {
+    expect(getUsableProviders(getSocialConfig({}), {})).toEqual({ google: false, facebook: false, any: false });
+  });
+});
 
 describe('getSocialConfig', () => {
   it('disables everything when env is empty', () => {

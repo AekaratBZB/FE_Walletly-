@@ -92,7 +92,7 @@ export const AuthView = () => {
 
         <h1 className="auth-card-title">{isLogin ? 'ยินดีต้อนรับกลับมา' : 'สร้างบัญชีใหม่'}</h1>
 
-        <SocialButtons mode={mode} disabled={isAuthLoading} onToken={handleSocialToken} onError={showError} />
+        <SocialButtons mode={mode} disabled={isAuthLoading} onToken={handleSocialToken} />
 
         {activeNotice && <AuthNotice {...activeNotice} />}
 

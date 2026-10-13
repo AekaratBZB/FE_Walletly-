@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { getSocialConfig } from './social/socialConfig';
+import { getSocialConfig, getUsableProviders } from './social/socialConfig';
 import { renderGoogleButton } from './social/googleAuth';
 import { initFacebook, loginWithFacebookPopup } from './social/facebookAuth';
 
@@ -16,16 +16,18 @@ const FacebookIcon = () => (
 );
 
 /**
- * Google + Facebook buttons. Hidden entirely when neither provider is configured.
+ * Google + Facebook buttons. A provider is hidden when it is not configured or
+ * its script failed to load; with none usable, nothing (not even the divider) renders.
  * Reports provider tokens through onToken(provider, token).
  */
-export const SocialButtons = ({ mode = 'login', disabled = false, onToken, onError }) => {
+export const SocialButtons = ({ mode = 'login', disabled = false, onToken }) => {
   const googleRef = useRef(null);
   const [isFacebookReady, setIsFacebookReady] = useState(false);
+  const [failed, setFailed] = useState({});
 
   // เก็บ callback ล่าสุดโดยไม่ต้อง render ปุ่ม Google ใหม่ทุกครั้งที่ parent render
-  const callbacksRef = useRef({ onToken, onError });
-  callbacksRef.current = { onToken, onError };
+  const onTokenRef = useRef(onToken);
+  onTokenRef.current = onToken;
 
   useEffect(() => {
     if (!socialConfig.isGoogleEnabled || !googleRef.current) return undefined;
@@ -33,9 +35,10 @@ export const SocialButtons = ({ mode = 'login', disabled = false, onToken, onErr
     renderGoogleButton(googleRef.current, {
       clientId: socialConfig.googleClientId,
       text: mode === 'register' ? 'signup_with' : 'signin_with',
-      onCredential: (idToken) => callbacksRef.current.onToken?.('google', idToken)
-    }).catch(() => {
-      if (!cancelled) callbacksRef.current.onError?.('ไม่สามารถโหลด Google ได้ กรุณาลองใหม่หรือใช้อีเมล');
+      onCredential: (idToken) => onTokenRef.current?.('google', idToken)
+    }).catch((err) => {
+      console.warn('Google sign-in unavailable:', err);
+      if (!cancelled) setFailed((prev) => ({ ...prev, google: true }));
     });
     return () => {
       cancelled = true;
@@ -49,19 +52,21 @@ export const SocialButtons = ({ mode = 'login', disabled = false, onToken, onErr
       .then(() => {
         if (!cancelled) setIsFacebookReady(true);
       })
-      .catch(() => {
-        if (!cancelled) callbacksRef.current.onError?.('ไม่สามารถโหลด Facebook ได้ กรุณาลองใหม่หรือใช้อีเมล');
+      .catch((err) => {
+        console.warn('Facebook sign-in unavailable:', err);
+        if (!cancelled) setFailed((prev) => ({ ...prev, facebook: true }));
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (!socialConfig.isAnyEnabled) return null;
+  const usable = getUsableProviders(socialConfig, failed);
+  if (!usable.any) return null;
 
   const handleFacebookClick = async () => {
     const accessToken = await loginWithFacebookPopup();
-    if (accessToken) callbacksRef.current.onToken?.('facebook', accessToken);
+    if (accessToken) onTokenRef.current?.('facebook', accessToken);
   };
 
   const isRegister = mode === 'register';
@@ -69,8 +74,8 @@ export const SocialButtons = ({ mode = 'login', disabled = false, onToken, onErr
   return (
     <>
       <div className={`auth-social-buttons${disabled ? ' is-disabled' : ''}`} aria-busy={disabled}>
-        {socialConfig.isGoogleEnabled && <div ref={googleRef} className="auth-google-btn" />}
-        {socialConfig.isFacebookEnabled && (
+        {usable.google && <div ref={googleRef} className="auth-google-btn" />}
+        {usable.facebook && (
           <button
             type="button"
             className="auth-social-btn facebook-btn"

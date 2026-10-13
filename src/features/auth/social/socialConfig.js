@@ -19,3 +19,10 @@ export const getSocialConfig = (env = import.meta.env) => {
     isAnyEnabled: !!googleClientId || !!facebookAppId
   };
 };
+
+// provider ที่ script โหลดไม่ได้ (เช่นโดน ad blocker) จะถูกซ่อนเงียบๆ แทนการแสดง error
+export const getUsableProviders = (config, failed = {}) => {
+  const google = config.isGoogleEnabled && !failed.google;
+  const facebook = config.isFacebookEnabled && !failed.facebook;
+  return { google, facebook, any: google || facebook };
+};
