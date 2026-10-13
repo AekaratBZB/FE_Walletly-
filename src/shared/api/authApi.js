@@ -44,12 +44,10 @@ export const authApi = {
     return data;
   },
 
-  async loginSocial(provider, { email, displayName, avatarUrl, idToken, accessToken } = {}) {
+  // BE ตรวจ token กับ Google / Facebook เอง และไม่ใช้ email / ชื่อที่ FE ส่งมา
+  async loginSocial(provider, token) {
     const endpoint = provider === 'facebook' ? '/auth/facebook' : '/auth/google';
-    const body =
-      provider === 'facebook'
-        ? { accessToken, email, displayName, avatarUrl }
-        : { idToken, email, displayName, avatarUrl };
+    const body = provider === 'facebook' ? { accessToken: token } : { idToken: token };
 
     const data = await apiClient(endpoint, {
       method: 'POST',

@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authApi, getStoredToken, healthApi } from '../shared/api';
+import { toAuthError, toUserData, restoreStoredUser } from './authHelpers';
 
 const AUTH_STORAGE_KEY = 'future_wallet_auth_user';
 const REMEMBER_ME_KEY = 'future_wallet_remember_email';
+
+const PROVIDER_NAMES = { google: 'Google', facebook: 'Facebook' };
 
 export const clearMockLocalStorage = () => {
   try {
@@ -12,6 +15,23 @@ export const clearMockLocalStorage = () => {
     localStorage.removeItem('finsmart_debts_v1');
   } catch (e) {
     console.error('Failed to clear mock storage:', e);
+  }
+};
+
+const persistUser = (userData) => {
+  try {
+    if (userData) localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
+    else localStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch (e) {
+    console.error('Failed to persist user auth state:', e);
+  }
+};
+
+const readStorage = (key) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
   }
 };
 
@@ -27,20 +47,8 @@ const verifyEmailOnce = (token) => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : null;
-    } catch (e) {
-      console.error('Failed to load user auth state:', e);
-      return null;
-    }
-  });
-
-  const [savedEmail, setSavedEmail] = useState(() => {
-    return localStorage.getItem(REMEMBER_ME_KEY) || '';
-  });
-
+  const [user, setUser] = useState(() => restoreStoredUser(readStorage(AUTH_STORAGE_KEY), !!getStoredToken()));
+  const [savedEmail, setSavedEmail] = useState(() => readStorage(REMEMBER_ME_KEY) || '');
   const [backendStatus, setBackendStatus] = useState('checking'); // 'connected' | 'offline' | 'checking'
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
@@ -50,6 +58,35 @@ export const AuthProvider = ({ children }) => {
     const token = new URLSearchParams(window.location.search).get('token');
     return isVerifyPath && token ? { status: 'verifying', token, message: '' } : null;
   });
+
+  const rememberEmail = (email) => {
+    try {
+      if (email) localStorage.setItem(REMEMBER_ME_KEY, email);
+      else localStorage.removeItem(REMEMBER_ME_KEY);
+    } catch (e) {
+      console.error('Failed to store remembered email:', e);
+    }
+    setSavedEmail(email || '');
+  };
+
+  // ใช้หลัง BE ออก token ให้แล้วเท่านั้น
+  const signIn = (dto, extra) => {
+    clearMockLocalStorage();
+    const userData = toUserData(dto, extra);
+    setUser(userData);
+    persistUser(userData);
+    setBackendStatus('connected');
+    return userData;
+  };
+
+  const runAuth = async (action) => {
+    setIsAuthLoading(true);
+    try {
+      return await action();
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
 
   // Check Backend health and verify user token on app mount
   useEffect(() => {
@@ -61,20 +98,9 @@ export const AuthProvider = ({ children }) => {
       try {
         const data = await verifyEmailOnce(token);
         if (!isMounted) return;
-        clearMockLocalStorage();
-        const userData = {
-          id: data.id,
-          name: data.displayName,
-          email: data.email,
-          avatarUrl: data.avatarUrl,
-          isGuest: false,
-          registeredAt: new Date().toISOString()
-        };
-        setUser(userData);
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
-        localStorage.setItem(REMEMBER_ME_KEY, data.email);
-        setSavedEmail(data.email);
-        setEmailVerification({ status: 'success', message: 'ยืนยันอีเมลสำเร็จ ยินดีต้อนรับสู่ Walletly!' });
+        signIn(data, { registeredAt: new Date().toISOString() });
+        rememberEmail(data.email);
+        setEmailVerification({ status: 'success', message: 'ยืนยันอีเมลสำเร็จ ยินดีต้อนรับสู่ Future Wallet!' });
       } catch (err) {
         if (!isMounted) return;
         setEmailVerification({
@@ -93,34 +119,26 @@ export const AuthProvider = ({ children }) => {
         await healthApi.check();
         if (isMounted) setBackendStatus('connected');
 
-        const token = getStoredToken();
-        if (token) {
+        if (getStoredToken()) {
           try {
             const me = await authApi.getMe();
             if (isMounted && me) {
-              const updatedUser = {
-                id: me.id,
-                name: me.displayName,
-                email: me.email,
-                avatarUrl: me.avatarUrl,
-                isGuest: me.isGuest || false,
-                lastLoginAt: me.lastLoginAt
-              };
+              const updatedUser = toUserData(me, { isGuest: me.isGuest || false, lastLoginAt: me.lastLoginAt });
               setUser(updatedUser);
-              localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser));
+              persistUser(updatedUser);
             }
           } catch (err) {
-            console.warn('Session verification failed, logging out or offline:', err);
-            // If token expired (401), clear invalid auth
+            console.warn('Session verification failed:', err);
             if (err?.status === 401) {
               authApi.logout();
               clearMockLocalStorage();
+              persistUser(null);
               if (isMounted) setUser(null);
             }
           }
         }
       } catch (err) {
-        console.warn('Backend server unreachable, running in local/offline mode:', err);
+        console.warn('Backend server unreachable:', err);
         if (isMounted) setBackendStatus('offline');
       }
     };
@@ -131,195 +149,57 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  const login = async (email, password, rememberMe = true) => {
-    setIsAuthLoading(true);
-    try {
-      const data = await authApi.login(email, password);
-      clearMockLocalStorage();
-      const userData = {
-        id: data.id,
-        name: data.displayName || email.split('@')[0],
-        email: data.email,
-        avatarUrl: data.avatarUrl,
-        isGuest: false,
-        loginAt: new Date().toISOString()
-      };
-
-      setUser(userData);
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
-
-      if (rememberMe) {
-        localStorage.setItem(REMEMBER_ME_KEY, email);
-        setSavedEmail(email);
-      } else {
-        localStorage.removeItem(REMEMBER_ME_KEY);
-        setSavedEmail('');
+  const login = (email, password, rememberMe = true) =>
+    runAuth(async () => {
+      try {
+        const data = await authApi.login(email, password);
+        const userData = signIn(data, { loginAt: new Date().toISOString() });
+        rememberEmail(rememberMe ? email : '');
+        return { success: true, user: userData };
+      } catch (err) {
+        console.warn('Login failed:', err);
+        return { success: false, error: toAuthError(err, { fallback: 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' }) };
       }
+    });
 
-      setBackendStatus('connected');
-      setIsAuthLoading(false);
-      return { success: true, user: userData };
-    } catch (err) {
-      console.warn('Backend login failed:', err);
+  const register = (fullName, email, password) =>
+    runAuth(async () => {
+      try {
+        const data = await authApi.register(fullName, email, password);
 
-      // If backend is offline or network error, allow simulated fallback for demo/offline test
-      if (err.status === undefined || err.status === 0 || err.status >= 500) {
-        const username = email.split('@')[0] || 'ผู้ใช้งาน';
-        const formattedName = username.charAt(0).toUpperCase() + username.slice(1);
-        const userData = {
-          name: formattedName,
-          email: email,
-          isGuest: false,
-          isOffline: true,
-          loginAt: new Date().toISOString()
-        };
-        setUser(userData);
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
-        if (rememberMe) {
-          localStorage.setItem(REMEMBER_ME_KEY, email);
-          setSavedEmail(email);
+        // BE เปิดยืนยันอีเมล: ยังไม่มีบัญชี/token จนกว่าผู้ใช้จะกดลิงก์ในอีเมล
+        if (!data?.accessToken) {
+          rememberEmail(email);
+          setBackendStatus('connected');
+          return {
+            success: true,
+            pendingVerification: true,
+            message: data?.message || 'เราได้ส่งลิงก์ยืนยันไปที่อีเมลแล้ว กรุณาตรวจสอบกล่องจดหมาย'
+          };
         }
-        setIsAuthLoading(false);
-        return { success: true, user: userData, isOffline: true };
+
+        const userData = signIn(data, { registeredAt: new Date().toISOString() });
+        rememberEmail(email);
+        return { success: true, user: userData };
+      } catch (err) {
+        console.warn('Register failed:', err);
+        return { success: false, error: toAuthError(err, { fallback: 'ไม่สามารถสมัครสมาชิกได้ กรุณาตรวจสอบข้อมูล' }) };
       }
+    });
 
-      setIsAuthLoading(false);
-      return {
-        success: false,
-        error: err.message || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง'
-      };
-    }
-  };
-
-  const register = async (fullName, email, password) => {
-    setIsAuthLoading(true);
-    try {
-      const data = await authApi.register(fullName, email, password);
-
-      // BE เปิดยืนยันอีเมล: ยังไม่มีบัญชี/token จนกว่าผู้ใช้จะกดลิงก์ในอีเมล
-      if (!data?.accessToken) {
-        localStorage.setItem(REMEMBER_ME_KEY, email);
-        setSavedEmail(email);
-        setBackendStatus('connected');
-        setIsAuthLoading(false);
-        return {
-          success: true,
-          pendingVerification: true,
-          message: data?.message || 'เราได้ส่งลิงก์ยืนยันไปที่อีเมลแล้ว กรุณาตรวจสอบกล่องจดหมาย'
-        };
+  // token = Google ID token หรือ Facebook access token จาก SDK จริง
+  const loginWithSocial = (provider, token) =>
+    runAuth(async () => {
+      try {
+        const data = await authApi.loginSocial(provider, token);
+        const userData = signIn(data, { provider, loginAt: new Date().toISOString() });
+        return { success: true, user: userData };
+      } catch (err) {
+        console.warn(`${provider} login failed:`, err);
+        const message = `เข้าสู่ระบบด้วย ${PROVIDER_NAMES[provider] || provider} ไม่สำเร็จ กรุณาลองใหม่หรือใช้อีเมล`;
+        return { success: false, error: toAuthError(err, { fallback: message, unauthorized: message }) };
       }
-
-      clearMockLocalStorage();
-      const userData = {
-        id: data.id,
-        name: data.displayName || fullName,
-        email: data.email,
-        avatarUrl: data.avatarUrl,
-        isGuest: false,
-        registeredAt: new Date().toISOString()
-      };
-
-      setUser(userData);
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
-      localStorage.setItem(REMEMBER_ME_KEY, email);
-      setSavedEmail(email);
-
-      setBackendStatus('connected');
-      setIsAuthLoading(false);
-      return { success: true, user: userData };
-    } catch (err) {
-      console.warn('Backend register failed:', err);
-
-      if (err.status === undefined || err.status === 0 || err.status >= 500) {
-        const userData = {
-          name: fullName || 'สมาชิกใหม่',
-          email: email,
-          isGuest: false,
-          isOffline: true,
-          registeredAt: new Date().toISOString()
-        };
-        setUser(userData);
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
-        localStorage.setItem(REMEMBER_ME_KEY, email);
-        setSavedEmail(email);
-        setIsAuthLoading(false);
-        return { success: true, user: userData, isOffline: true };
-      }
-
-      setIsAuthLoading(false);
-      return {
-        success: false,
-        error: err.message || 'ไม่สามารถลงทะเบียนได้ กรุณาตรวจสอบข้อมูล'
-      };
-    }
-  };
-
-  const loginWithSocial = async (provider, accountInfo = null) => {
-    setIsAuthLoading(true);
-    const providerName = provider === 'google' ? 'Google' : 'Facebook';
-    const emailToUse =
-      typeof accountInfo === 'string'
-        ? accountInfo
-        : accountInfo?.email ||
-          (provider === 'google' ? 'user.future@gmail.com' : 'user.future@facebook.com');
-    const displayNameToUse =
-      accountInfo?.displayName ||
-      (emailToUse ? emailToUse.split('@')[0] : `${providerName} User`);
-    const avatarUrlToUse =
-      accountInfo?.avatarUrl ||
-      (provider === 'google'
-        ? 'https://lh3.googleusercontent.com/a/default-user'
-        : 'https://graph.facebook.com/user/picture');
-
-    try {
-      const data = await authApi.loginSocial(provider, {
-        email: emailToUse,
-        displayName: displayNameToUse,
-        avatarUrl: avatarUrlToUse
-      });
-
-      clearMockLocalStorage();
-      const userData = {
-        id: data.id,
-        name: data.displayName || displayNameToUse,
-        email: data.email,
-        avatarUrl: data.avatarUrl || avatarUrlToUse,
-        provider: provider,
-        isGuest: false,
-        loginAt: new Date().toISOString()
-      };
-
-      setUser(userData);
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
-      setBackendStatus('connected');
-      setIsAuthLoading(false);
-      return { success: true, user: userData };
-    } catch (err) {
-      // BE ตอบกลับมาแล้วแต่ปฏิเสธ (เช่น ยังไม่ได้เชื่อม Google/Facebook SDK จึงไม่มี token จริง):
-      // ห้ามแอบล็อกอินแบบ local เพราะจะได้ผู้ใช้ที่ไม่มี token และเรียก API ไม่ได้ทั้งแอป
-      if (err?.status && err.status < 500) {
-        console.warn('Social backend login rejected:', err);
-        setIsAuthLoading(false);
-        return {
-          success: false,
-          error: `ยังไม่รองรับการเข้าสู่ระบบด้วย ${providerName} กรุณาใช้อีเมลและรหัสผ่าน`
-        };
-      }
-
-      console.warn('Social backend login failed (offline), falling back to local:', err);
-      const userData = {
-        name: displayNameToUse,
-        email: emailToUse,
-        provider: provider,
-        isGuest: false,
-        loginAt: new Date().toISOString()
-      };
-      setUser(userData);
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
-      setIsAuthLoading(false);
-      return { success: true, user: userData };
-    }
-  };
+    });
 
   const loginAsGuest = () => {
     const guestUser = {
@@ -330,7 +210,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     setUser(guestUser);
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(guestUser));
+    persistUser(guestUser);
     return { success: true, user: guestUser };
   };
 
@@ -338,7 +218,7 @@ export const AuthProvider = ({ children }) => {
     authApi.logout();
     clearMockLocalStorage();
     setUser(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
+    persistUser(null);
   };
 
   return (
