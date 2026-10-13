@@ -2,11 +2,6 @@ import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { validateLogin } from './validation';
 
-// Vite แทน import.meta.env.DEV เป็น false ตอน build จึงตัดบัญชีทดสอบออกจาก bundle production
-const DEV_TEST_ACCOUNT = import.meta.env.DEV
-  ? { email: 'test.user@walletly.app', password: 'Password123!' }
-  : null;
-
 export const LoginForm = ({ initialEmail = '', isLoading, onSubmit }) => {
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
@@ -20,12 +15,6 @@ export const LoginForm = ({ initialEmail = '', isLoading, onSubmit }) => {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
     onSubmit({ email: email.trim(), password, rememberMe });
-  };
-
-  const fillTestAccount = () => {
-    setEmail(DEV_TEST_ACCOUNT.email);
-    setPassword(DEV_TEST_ACCOUNT.password);
-    setErrors({});
   };
 
   return (
@@ -87,18 +76,6 @@ export const LoginForm = ({ initialEmail = '', isLoading, onSubmit }) => {
       <button type="submit" className="auth-submit-btn" disabled={isLoading}>
         {isLoading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
       </button>
-
-      {DEV_TEST_ACCOUNT && (
-        <div className="auth-dev-box">
-          <div>
-            <div className="auth-dev-box-title">บัญชีทดสอบ (แสดงเฉพาะ dev)</div>
-            <div>{DEV_TEST_ACCOUNT.email}</div>
-          </div>
-          <button type="button" className="auth-dev-box-btn" onClick={fillTestAccount}>
-            กรอกอัตโนมัติ
-          </button>
-        </div>
-      )}
     </form>
   );
 };

@@ -420,37 +420,6 @@
   cursor: not-allowed;
 }
 
-/* DEV-only test account */
-.auth-dev-box {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  padding: 0.6rem 0.8rem;
-  border-radius: 8px;
-  background: #fffbeb;
-  border: 1px dashed #f59e0b;
-  font-size: 0.75rem;
-  color: #78350f;
-}
-
-.auth-dev-box-title {
-  font-weight: 600;
-}
-
-.auth-dev-box-btn {
-  background: #fef3c7;
-  border: 1px solid #f59e0b;
-  color: #92400e;
-  padding: 4px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: 600;
-  white-space: nowrap;
-  font-family: inherit;
-}
-
 /* Footer links */
 .auth-footer-switch {
   display: flex;
