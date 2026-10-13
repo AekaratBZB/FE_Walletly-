@@ -3,6 +3,7 @@ import { useWallet } from './context/WalletContext';
 import { useAuth } from './context/AuthContext';
 import { useCookieConsent } from './context/CookieContext';
 import { Navbar } from './components/Navbar';
+import { AddTransactionFab } from './components/AddTransactionFab';
 import { ToastContainer } from './components/Toast';
 import { AuthView } from './features/auth';
 import { CookieConsentBanner, CookiePreferencesModal, PrivacyPolicyModal } from './features/cookie';
@@ -79,8 +80,10 @@ export const App = () => {
         {renderActiveTab()}
       </main>
 
+      <AddTransactionFab />
+
       {/* Footer */}
-      <footer style={{
+      <footer className="app-footer" style={{
         textAlign: 'center',
         padding: '1.5rem',
         fontSize: '0.8rem',

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { formatCurrency, formatDate } from '../../shared/formatters';
-import { Search, Plus, Trash2, Download } from 'lucide-react';
+import { Search, Plus, Trash2, Download, ReceiptText, X } from 'lucide-react';
 
 export const TransactionsTab = () => {
   const {
@@ -55,7 +55,7 @@ export const TransactionsTab = () => {
             onClick={() => setIsAddTxOpen(true)}
           >
             <Plus size={14} />
-            <span>+ บันทึกรายการ</span>
+            <span>บันทึกรายการ</span>
           </button>
         </div>
       </div>
@@ -103,32 +103,6 @@ export const TransactionsTab = () => {
         </div>
       </div>
 
-      {/* API Source Proof Banner */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0.5rem 0.85rem',
-          borderRadius: '8px',
-          background: 'rgba(16, 185, 129, 0.08)',
-          border: '1px solid rgba(16, 185, 129, 0.25)',
-          fontSize: '0.78rem',
-          color: '#10b981',
-          marginBottom: '1rem',
-          flexWrap: 'wrap',
-          gap: '6px'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span>🟢</span>
-          <span><b>แหล่งข้อมูล:</b> ดึงสดจาก .NET Web API & SQL Server (https://localhost:7056/api/Transactions)</span>
-        </div>
-        <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>
-          โหลดข้อมูลจริง ({transactions.length} รายการในฐานข้อมูล)
-        </div>
-      </div>
-
       {/* Transactions Table Card */}
       <div className="card">
         <div className="table-container">
@@ -148,11 +122,41 @@ export const TransactionsTab = () => {
               {filteredTransactions.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="text-center text-muted" style={{ padding: '3rem 1rem' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📄</div>
-                    <div style={{ fontWeight: 600 }}>ไม่พบรายการธุรกรรม</div>
-                    <div style={{ fontSize: '0.85rem', marginTop: '4px' }}>
-                      กดปุ่ม "+ บันทึกรายการ" เพื่อเริ่มต้นบันทึกรายรับหรือรายจ่ายเข้าฐานข้อมูล
-                    </div>
+                    {transactions.length === 0 ? (
+                      <>
+                        <div className="tx-empty-icon">
+                          <ReceiptText size={22} />
+                        </div>
+                        <div className="text-main" style={{ fontWeight: 600 }}>เริ่มบันทึกรายการแรกของคุณ</div>
+                        <div style={{ fontSize: '0.85rem', margin: '4px 0 1rem' }}>
+                          บันทึกรายรับหรือรายจ่าย แล้วภาพรวมกับรายงานจะคำนวณให้อัตโนมัติ
+                        </div>
+                        <button className="btn btn-primary btn-sm" onClick={() => setIsAddTxOpen(true)}>
+                          <Plus size={14} />
+                          <span>บันทึกรายการแรก</span>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="tx-empty-icon">
+                          <Search size={22} />
+                        </div>
+                        <div className="text-main" style={{ fontWeight: 600 }}>ไม่พบรายการที่ตรงกับการค้นหา</div>
+                        <div style={{ fontSize: '0.85rem', margin: '4px 0 1rem' }}>
+                          ลองเปลี่ยนคำค้นหาหรือประเภทรายการ
+                        </div>
+                        <button
+                          className="btn btn-outline btn-sm"
+                          onClick={() => {
+                            setSearchTerm('');
+                            setFilterType('all');
+                          }}
+                        >
+                          <X size={14} />
+                          <span>ล้างตัวกรอง</span>
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -180,25 +184,7 @@ export const TransactionsTab = () => {
                       </td>
                       <td>{typeBadge}</td>
                       <td style={{ fontWeight: 600 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>{t.category}</span>
-                          {t.id && t.id.length > 25 && (
-                            <span
-                              style={{
-                                fontSize: '0.65rem',
-                                padding: '1px 5px',
-                                borderRadius: '4px',
-                                background: 'rgba(16, 185, 129, 0.12)',
-                                color: '#10b981',
-                                border: '1px solid rgba(16, 185, 129, 0.3)',
-                                fontWeight: 500
-                              }}
-                              title={`รหัสจริงในฐานข้อมูล SQL Server: ${t.id}`}
-                            >
-                              SQL DB
-                            </span>
-                          )}
-                        </div>
+                        {t.category}
                       </td>
                       <td>
                         <span
