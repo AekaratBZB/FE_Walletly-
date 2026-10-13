@@ -22,7 +22,7 @@ export const FixedCostsTab = () => {
     resetFixedCostsMonthly
   } = useWallet();
 
-  const monthlyIncome = Number(allocationSettings.monthlyIncome) || 50000;
+  const monthlyIncome = Number(allocationSettings.monthlyIncome) || 0;
 
   const totalAmount = fixedCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
   const paidAmount = fixedCosts.filter(c => c.isPaid).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
@@ -31,7 +31,10 @@ export const FixedCostsTab = () => {
 
   let ratioColorClass = 'text-success';
   let ratioDesc = 'สัดส่วนเหมาะสม (ต่ำกว่า 40%)';
-  if (burdenRatio > 50) {
+  if (monthlyIncome <= 0) {
+    ratioColorClass = 'text-muted';
+    ratioDesc = 'กรอกรายได้ต่อเดือนในแท็บแบ่งสัดส่วนเพื่อคำนวณ';
+  } else if (burdenRatio > 50) {
     ratioColorClass = 'text-danger';
     ratioDesc = 'ภาระตึงตัวสูง (เกิน 50% ของรายได้)';
   } else if (burdenRatio > 40) {
@@ -111,7 +114,7 @@ export const FixedCostsTab = () => {
 
         <StatCard
           label="Fixed Cost Burden Ratio"
-          value={`${burdenRatio.toFixed(1)}%`}
+          value={monthlyIncome > 0 ? `${burdenRatio.toFixed(1)}%` : '-'}
           subtext={ratioDesc}
           icon={Percent}
           colorScheme={burdenRatio > 50 ? 'rose' : burdenRatio > 40 ? 'amber' : 'emerald'}

@@ -9,14 +9,17 @@ import {
   Target,
   FileSpreadsheet,
   BarChart3,
-  Plus
+  Plus,
+  Landmark
 } from 'lucide-react';
+import { UserMenu } from './UserMenu';
 
 const TABS = [
   { id: 'dashboard', label: 'ภาพรวม', fullLabel: 'ภาพรวมการเงิน', icon: LayoutDashboard },
   { id: 'transactions', label: 'รายรับ-จ่าย', fullLabel: 'บันทึกรายรับ-รายจ่าย', icon: ReceiptText },
   { id: 'fixed-costs', label: 'ฟิกคอส', fullLabel: 'ฟิกคอสรายเดือน', icon: CalendarCheck },
   { id: 'projection', label: 'คาดการณ์เงิน', fullLabel: 'คาดการณ์กระแสเงินล่วงหน้า', icon: TrendingUp },
+  { id: 'debt', label: 'ปลอดหนี้', fullLabel: 'วางแผนปลอดหนี้ (Debt Payoff Planner)', icon: Landmark },
   { id: 'allocation', label: 'แบ่งสัดส่วน', fullLabel: 'แบ่งสัดส่วนการเงิน 50/30/20', icon: PieChart },
   { id: 'savings', label: 'แผนการออม', fullLabel: 'วางแผนเป้าหมายการออม', icon: Target },
   { id: 'tax', label: 'คำนวณภาษี', fullLabel: 'วางแผนและคำนวณภาษีบุคคล', icon: FileSpreadsheet },
@@ -30,7 +33,7 @@ export const Navbar = () => {
     <header className="top-header">
       <div className="navbar">
         {/* Modern FinTech Brand Logo */}
-        <div className="brand-logo" onClick={() => setActiveTab('dashboard')} role="button" tabIndex={0} title="Walletly - กลับสู่หน้าหลัก">
+        <div className="brand-logo" onClick={() => setActiveTab('dashboard')} role="button" tabIndex={0} title="Future Wallet - กลับสู่หน้าหลัก">
           <div className="brand-icon-wrapper">
             <div className="brand-icon">
               <svg
@@ -41,71 +44,30 @@ export const Navbar = () => {
                 xmlns="http://www.w3.org/2000/svg"
                 className="brand-svg"
               >
-                <defs>
-                  <linearGradient id="brandCyan" x1="0%" y1="100%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#38bdf8" />
-                    <stop offset="100%" stopColor="#818cf8" />
-                  </linearGradient>
-                  <linearGradient id="brandLight" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#ffffff" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-
-                {/* Card / Vault Background Plate */}
-                <rect
-                  x="3.5"
-                  y="5"
-                  width="25"
-                  height="22"
-                  rx="6.5"
-                  fill="rgba(255, 255, 255, 0.14)"
-                  stroke="rgba(255, 255, 255, 0.3)"
-                  strokeWidth="1.2"
-                />
-
-                {/* Glass sheen highlight */}
-                <rect x="3.5" y="5" width="25" height="11" rx="6" fill="url(#brandLight)" />
-
-                {/* Digital Card Chip Detail */}
-                <rect x="7" y="8.5" width="4.5" height="3.5" rx="1" fill="#34d399" opacity="0.9" />
-
-                {/* Dynamic Ascending W & Growth Trend */}
                 <path
-                  d="M8 18L12 23L16 16.5L20 23L24.5 12"
-                  stroke="#ffffff"
-                  strokeWidth="2.6"
+                  d="M5 11.5L9.5 22.5L14 13.5L18.5 22.5L24.5 9"
+                  stroke="currentColor"
+                  strokeWidth="3.2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
-
-                {/* Accent Arrow Head on Top Right */}
                 <path
-                  d="M20.5 12H24.5V16"
-                  stroke="#38bdf8"
-                  strokeWidth="2.6"
+                  d="M19.5 9H24.5V14"
+                  stroke="currentColor"
+                  strokeWidth="3.2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
-
-                {/* Glowing Growth Spark */}
-                <circle cx="24.5" cy="12" r="1.8" fill="#67e8f9" />
               </svg>
             </div>
-            <div className="brand-icon-glow" aria-hidden="true" />
           </div>
 
           <div className="brand-text-block">
             <div className="brand-title-wrap">
               <span className="brand-name">
-                Wallet<span className="brand-accent">ly</span>
-              </span>
-              <span className="brand-chip">
-                <span className="brand-chip-dot" />
-                <span>Smart FinOS</span>
+                Future <span className="brand-accent">Wallet</span>
               </span>
             </div>
-            <span className="brand-subtext">INTELLIGENT WEALTH OS</span>
           </div>
         </div>
 
@@ -134,15 +96,19 @@ export const Navbar = () => {
           </nav>
         </div>
 
-        {/* Quick Action Button */}
-        <div className="header-actions">
+        {/* Quick Action Button & User Profile */}
+        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <button
             className="btn btn-primary btn-sm"
             onClick={() => setIsAddTxOpen(true)}
+            title="บันทึกรายการ"
+            aria-label="บันทึกรายการ"
           >
             <Plus size={16} />
             <span>บันทึกรายการ</span>
           </button>
+
+          <UserMenu />
         </div>
       </div>
     </header>

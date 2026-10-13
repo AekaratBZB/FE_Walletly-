@@ -1,5 +1,7 @@
 import React, { useRef } from 'react';
+import { CHART_COLORS, CHART_PALETTE } from '../../shared/chartColors';
 import { useWallet } from '../../context/WalletContext';
+import { getStoredToken } from '../../shared/api';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -43,6 +45,7 @@ export const ReportsTab = () => {
   } = useWallet();
 
   const fileInputRef = useRef(null);
+  const isLoggedIn = !!getStoredToken();
 
   // 1. Doughnut Chart: Category Breakdown
   const categoryTotals = {};
@@ -57,19 +60,16 @@ export const ReportsTab = () => {
   const doughnutLabels = Object.keys(categoryTotals);
   const doughnutDataValues = Object.values(categoryTotals);
 
-  const colors = [
-    '#059669', '#3b82f6', '#8b5cf6', '#f59e0b', '#f43f5e',
-    '#10b981', '#0ea5e9', '#ec4899', '#6366f1', '#14b8a6'
-  ];
+  const colors = CHART_PALETTE;
 
   const categoryChartData = {
     labels: doughnutLabels.length > 0 ? doughnutLabels : ['ไม่มีข้อมูล'],
     datasets: [
       {
         data: doughnutDataValues.length > 0 ? doughnutDataValues : [1],
-        backgroundColor: doughnutLabels.length > 0 ? colors.slice(0, doughnutLabels.length) : ['#e2e8f0'],
+        backgroundColor: doughnutLabels.length > 0 ? colors.slice(0, doughnutLabels.length) : [CHART_COLORS.empty],
         borderWidth: 2,
-        borderColor: '#ffffff'
+        borderColor: CHART_COLORS.surface
       }
     ]
   };
@@ -87,7 +87,7 @@ export const ReportsTab = () => {
       {
         label: 'จำนวนเงิน (บาท)',
         data: [totalIncome, totalFixedCosts, totalVariable, totalSavings, Math.max(0, netCashflow)],
-        backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#059669'],
+        backgroundColor: [CHART_COLORS.income, CHART_COLORS.fixed, CHART_COLORS.expense, CHART_COLORS.savings, CHART_COLORS.net],
         borderRadius: 8
       }
     ]
@@ -99,9 +99,9 @@ export const ReportsTab = () => {
     datasets: [
       {
         data: [totalFixedCosts, totalVariable, totalSavings],
-        backgroundColor: ['#f59e0b', '#ef4444', '#10b981'],
+        backgroundColor: [CHART_COLORS.fixed, CHART_COLORS.expense, CHART_COLORS.savings],
         borderWidth: 2,
-        borderColor: '#ffffff'
+        borderColor: CHART_COLORS.surface
       }
     ]
   };
@@ -161,6 +161,8 @@ export const ReportsTab = () => {
                 plugins: {
                   legend: { position: 'bottom', labels: { font: { family: 'Prompt', size: 11 } } },
                   tooltip: {
+                    // Placeholder slice when empty: no tooltip, it is not a real amount
+                    enabled: doughnutLabels.length > 0,
                     callbacks: {
                       label: (ctx) => ` ${ctx.label}: ${(ctx.raw || 0).toLocaleString()} ฿`
                     }
@@ -251,7 +253,9 @@ export const ReportsTab = () => {
           <div>
             <div className="card-title">💾 สำรองข้อมูล & กู้คืนระบบ (Data Management & Backup)</div>
             <div className="card-subtitle">
-              ข้อมูลทั้งหมดถูกเก็บอย่างปลอดภัยบนเครื่องของคุณ (Browser LocalStorage)
+              {isLoggedIn
+                ? 'ส่งออกหรือสำรองข้อมูลบัญชีของคุณเป็นไฟล์ CSV / JSON'
+                : 'ข้อมูลทั้งหมดถูกเก็บอย่างปลอดภัยบนเครื่องของคุณ (Browser LocalStorage)'}
             </div>
           </div>
         </div>
@@ -279,10 +283,14 @@ export const ReportsTab = () => {
             />
           </label>
 
-          <button className="btn btn-outline" onClick={handleResetDemo}>
-            <RotateCcw size={16} />
-            <span>โหลด Demo Data</span>
-          </button>
+          {/* Demo data only lives locally and never syncs, so it would mix
+              fake rows into a real account */}
+          {!isLoggedIn && (
+            <button className="btn btn-outline" onClick={handleResetDemo}>
+              <RotateCcw size={16} />
+              <span>โหลด Demo Data</span>
+            </button>
+          )}
         </div>
 
         <div className="mt-4 pt-3 flex justify-between items-center" style={{ borderTop: '1px solid var(--border-light)' }}>

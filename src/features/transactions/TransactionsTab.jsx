@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { formatCurrency, formatDate } from '../../shared/formatters';
-import { Search, Plus, Trash2, Download } from 'lucide-react';
+import { Search, Plus, Trash2, Download, ReceiptText, X } from 'lucide-react';
 
 export const TransactionsTab = () => {
   const {
@@ -55,7 +55,7 @@ export const TransactionsTab = () => {
             onClick={() => setIsAddTxOpen(true)}
           >
             <Plus size={14} />
-            <span>+ บันทึกรายการ</span>
+            <span>บันทึกรายการ</span>
           </button>
         </div>
       </div>
@@ -122,11 +122,41 @@ export const TransactionsTab = () => {
               {filteredTransactions.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="text-center text-muted" style={{ padding: '3rem 1rem' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📄</div>
-                    <div style={{ fontWeight: 600 }}>ไม่พบรายการธุรกรรม</div>
-                    <div style={{ fontSize: '0.85rem', marginTop: '4px' }}>
-                      กดปุ่ม "+ บันทึกรายการ" เพื่อเริ่มต้นบันทึกรายรับหรือรายจ่าย
-                    </div>
+                    {transactions.length === 0 ? (
+                      <>
+                        <div className="tx-empty-icon">
+                          <ReceiptText size={22} />
+                        </div>
+                        <div className="text-main" style={{ fontWeight: 600 }}>เริ่มบันทึกรายการแรกของคุณ</div>
+                        <div style={{ fontSize: '0.85rem', margin: '4px 0 1rem' }}>
+                          บันทึกรายรับหรือรายจ่าย แล้วภาพรวมกับรายงานจะคำนวณให้อัตโนมัติ
+                        </div>
+                        <button className="btn btn-primary btn-sm" onClick={() => setIsAddTxOpen(true)}>
+                          <Plus size={14} />
+                          <span>บันทึกรายการแรก</span>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="tx-empty-icon">
+                          <Search size={22} />
+                        </div>
+                        <div className="text-main" style={{ fontWeight: 600 }}>ไม่พบรายการที่ตรงกับการค้นหา</div>
+                        <div style={{ fontSize: '0.85rem', margin: '4px 0 1rem' }}>
+                          ลองเปลี่ยนคำค้นหาหรือประเภทรายการ
+                        </div>
+                        <button
+                          className="btn btn-outline btn-sm"
+                          onClick={() => {
+                            setSearchTerm('');
+                            setFilterType('all');
+                          }}
+                        >
+                          <X size={14} />
+                          <span>ล้างตัวกรอง</span>
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -153,7 +183,9 @@ export const TransactionsTab = () => {
                         {formatDate(t.date)}
                       </td>
                       <td>{typeBadge}</td>
-                      <td style={{ fontWeight: 600 }}>{t.category}</td>
+                      <td style={{ fontWeight: 600 }}>
+                        {t.category}
+                      </td>
                       <td>
                         <span
                           style={{

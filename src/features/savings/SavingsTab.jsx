@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { StatCard } from '../../components/StatCard';
-import { formatCurrency } from '../../shared/formatters';
+import { formatCurrency, getCurrentMonthPrefix } from '../../shared/formatters';
 import {
   Target,
   PiggyBank,
@@ -15,7 +15,7 @@ export const SavingsTab = () => {
   const {
     savingsGoals,
     fixedCosts,
-    allocationSettings,
+    transactions,
     setIsAddGoalOpen,
     setQuickDepositGoal,
     deleteSavingsGoal,
@@ -25,10 +25,14 @@ export const SavingsTab = () => {
   const totalSaved = savingsGoals.reduce((sum, g) => sum + (Number(g.currentAmount) || 0), 0);
   const totalTarget = savingsGoals.reduce((sum, g) => sum + (Number(g.targetAmount) || 0), 0);
 
-  // Emergency Fund Calculations
-  const monthlyIncome = Number(allocationSettings.monthlyIncome) || 50000;
+  // Emergency Fund Calculations: fixed costs + this month's actual recorded expenses
   const totalFixedCosts = fixedCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-  const monthlyEssentialSpend = totalFixedCosts + Math.max(10000, monthlyIncome * 0.25);
+  const currentMonthPrefix = getCurrentMonthPrefix();
+  const thisMonthExpenses = transactions
+    .filter(t => t.type === 'expense' && (t.date || '').startsWith(currentMonthPrefix))
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+  const monthlyEssentialSpend = totalFixedCosts + thisMonthExpenses;
+  const canCreateEmergencyGoal = monthlyEssentialSpend > 0;
 
   const ef3 = monthlyEssentialSpend * 3;
   const ef6 = monthlyEssentialSpend * 6;
@@ -54,10 +58,10 @@ export const SavingsTab = () => {
   };
 
   // Compound Interest State
-  const [ciInitial, setCiInitial] = useState('10000');
-  const [ciMonthly, setCiMonthly] = useState('5000');
-  const [ciRate, setCiRate] = useState('8');
-  const [ciYears, setCiYears] = useState('10');
+  const [ciInitial, setCiInitial] = useState('');
+  const [ciMonthly, setCiMonthly] = useState('');
+  const [ciRate, setCiRate] = useState('');
+  const [ciYears, setCiYears] = useState('');
 
   const initial = parseFloat(ciInitial) || 0;
   const monthly = parseFloat(ciMonthly) || 0;
@@ -227,7 +231,9 @@ export const SavingsTab = () => {
                 <span>คำนวณเงินสำรองฉุกเฉิน (Emergency Fund)</span>
               </div>
               <div className="card-subtitle">
-                คำนวณจากค่าใช้จ่ายจำเป็นเดือนละ {formatCurrency(Math.round(monthlyEssentialSpend))}
+                {canCreateEmergencyGoal
+                  ? `คำนวณจากค่าใช้จ่ายจำเป็นเดือนละ ${formatCurrency(Math.round(monthlyEssentialSpend))}`
+                  : 'กรอกรายได้ต่อเดือนหรือเพิ่มฟิกคอสก่อน เพื่อคำนวณเงินสำรองฉุกเฉิน'}
               </div>
             </div>
           </div>
@@ -239,18 +245,20 @@ export const SavingsTab = () => {
               <button
                 className="btn btn-outline btn-sm mt-2"
                 style={{ width: '100%', fontSize: '0.75rem', padding: '0.25rem 0.4rem' }}
+                disabled={!canCreateEmergencyGoal}
                 onClick={() => handleCreateEmergencyGoal(3)}
               >
                 + ตั้งเป้า 3 ด.
               </button>
             </div>
 
-            <div className="p-3" style={{ background: 'var(--primary-light)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(5, 150, 105, 0.2)' }}>
+            <div className="p-3" style={{ background: 'var(--primary-light)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(244, 112, 11, 0.25)' }}>
               <div className="text-xs text-primary font-semibold">แนะนำ (6 เดือน) ⭐</div>
               <div className="num-font font-bold text-lg text-primary mt-1">{formatCurrency(Math.round(ef6))}</div>
               <button
                 className="btn btn-primary btn-sm mt-2"
                 style={{ width: '100%', fontSize: '0.75rem', padding: '0.25rem 0.4rem' }}
+                disabled={!canCreateEmergencyGoal}
                 onClick={() => handleCreateEmergencyGoal(6)}
               >
                 + ตั้งเป้า 6 ด.
@@ -263,6 +271,7 @@ export const SavingsTab = () => {
               <button
                 className="btn btn-outline btn-sm mt-2"
                 style={{ width: '100%', fontSize: '0.75rem', padding: '0.25rem 0.4rem' }}
+                disabled={!canCreateEmergencyGoal}
                 onClick={() => handleCreateEmergencyGoal(12)}
               >
                 + ตั้งเป้า 12 ด.
@@ -291,6 +300,7 @@ export const SavingsTab = () => {
                 className="form-input num-font"
                 style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
                 value={ciInitial}
+                placeholder="10000"
                 onChange={(e) => setCiInitial(e.target.value)}
               />
             </div>
@@ -301,6 +311,7 @@ export const SavingsTab = () => {
                 className="form-input num-font"
                 style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
                 value={ciMonthly}
+                placeholder="5000"
                 onChange={(e) => setCiMonthly(e.target.value)}
               />
             </div>
@@ -311,6 +322,7 @@ export const SavingsTab = () => {
                 className="form-input num-font"
                 style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
                 value={ciRate}
+                placeholder="8"
                 onChange={(e) => setCiRate(e.target.value)}
               />
             </div>
@@ -321,6 +333,7 @@ export const SavingsTab = () => {
                 className="form-input num-font"
                 style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
                 value={ciYears}
+                placeholder="10"
                 onChange={(e) => setCiYears(e.target.value)}
               />
             </div>

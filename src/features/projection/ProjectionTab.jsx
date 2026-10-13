@@ -12,9 +12,10 @@ import {
 } from 'lucide-react';
 
 export const ProjectionTab = () => {
-  const { fixedCosts, allocationSettings, transactions } = useWallet();
+  const { fixedCosts, allocationSettings, transactions, setActiveTab } = useWallet();
 
-  const monthlyIncome = Number(allocationSettings.monthlyIncome) || 50000;
+  const monthlyIncome = Number(allocationSettings.monthlyIncome) || 0;
+  const hasData = monthlyIncome > 0 || fixedCosts.length > 0 || transactions.length > 0;
   const totalFixedCosts = fixedCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
   const unpaidFixedCosts = fixedCosts.filter(c => !c.isPaid).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
 
@@ -30,7 +31,10 @@ export const ProjectionTab = () => {
 
   // Initial balance estimation
   const defaultBalance = Math.max(0, monthlyIncome - thisMonthExpenses - (totalFixedCosts - unpaidFixedCosts));
-  const [startingBalance, setStartingBalance] = useState(defaultBalance);
+  // Follow the derived estimate until the user types their own balance,
+  // so data that loads after first render still updates the field.
+  const [balanceOverride, setBalanceOverride] = useState(null);
+  const startingBalance = balanceOverride ?? defaultBalance;
   const [horizonDays, setHorizonDays] = useState(30);
 
   const availableForSpending = Math.max(0, (Number(startingBalance) || 0) - unpaidFixedCosts);
@@ -86,7 +90,16 @@ export const ProjectionTab = () => {
       return;
     }
 
-    const disposableIncome = Math.max(1, monthlyIncome - totalFixedCosts);
+    if (monthlyIncome - totalFixedCosts <= 0) {
+      alert(
+        monthlyIncome <= 0
+          ? 'กรุณากรอกรายได้ต่อเดือนในแท็บแบ่งสัดส่วนก่อนจำลองการซื้อ'
+          : 'ฟิกคอสเท่ากับหรือเกินรายได้ต่อเดือนแล้ว ไม่มีเงินอิสระเหลือสำหรับการซื้อนี้'
+      );
+      return;
+    }
+
+    const disposableIncome = monthlyIncome - totalFixedCosts;
     const monthlyPayment = months > 1 ? price / months : price;
     const impactRatio = (monthlyPayment / disposableIncome) * 100;
 
@@ -120,15 +133,41 @@ export const ProjectionTab = () => {
     });
   };
 
-  return (
-    <div className="tab-panel active">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-        <div>
-          <h2>🔮 คำนวณเงินล่วงหน้า & สภาพคล่อง (Cash Flow & Runway)</h2>
-          <p>พยากรณ์เงินคงเหลือรายวัน คำนวณงบกินใช้อย่างปลอดภัย และจำลองการซื้อสินค้าชิ้นใหญ่</p>
+  const header = (
+    <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+      <div>
+        <h2>🔮 คำนวณเงินล่วงหน้า & สภาพคล่อง (Cash Flow & Runway)</h2>
+        <p>พยากรณ์เงินคงเหลือรายวัน คำนวณงบกินใช้อย่างปลอดภัย และจำลองการซื้อสินค้าชิ้นใหญ่</p>
+      </div>
+    </div>
+  );
+
+  if (!hasData) {
+    return (
+      <div className="tab-panel active">
+        {header}
+        <div className="card text-center p-4">
+          <Hourglass size={32} className="text-muted" style={{ margin: '0 auto' }} />
+          <h3 className="mt-4">ยังไม่มีข้อมูลสำหรับคำนวณ</h3>
+          <p className="text-muted mt-1 mb-4">
+            กรอกรายได้ต่อเดือน หรือเพิ่มฟิกคอส/รายการรายรับ-จ่าย เพื่อเริ่มพยากรณ์กระแสเงินสด
+          </p>
+          <div className="flex gap-2 flex-wrap" style={{ justifyContent: 'center' }}>
+            <button type="button" className="btn btn-primary" onClick={() => setActiveTab('allocation')}>
+              กรอกรายได้ต่อเดือน
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setActiveTab('fixed-costs')}>
+              เพิ่มฟิกคอส
+            </button>
+          </div>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="tab-panel active">
+      {header}
 
       {/* 4 Stat Cards */}
       <div className="grid grid-cols-4 mb-6">
@@ -281,7 +320,7 @@ export const ProjectionTab = () => {
                 className="form-input num-font"
                 style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
                 value={startingBalance}
-                onChange={(e) => setStartingBalance(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setBalanceOverride(parseFloat(e.target.value) || 0)}
               />
             </div>
 
