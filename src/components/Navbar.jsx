@@ -68,7 +68,6 @@ export const Navbar = () => {
                 Future <span className="brand-accent">Wallet</span>
               </span>
             </div>
-            <span className="brand-subtext">INTELLIGENT WEALTH OS</span>
           </div>
         </div>
 

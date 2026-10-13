@@ -89,6 +89,7 @@ export const AuthView = () => {
           </div>
           <span className="auth-brand-name">Future Wallet</span>
         </div>
+        <p className="auth-brand-tagline">ออมได้ · หนี้หมด · ภาษีไม่พลาด</p>
 
         <h1 className="auth-card-title">{isLogin ? 'ยินดีต้อนรับกลับมา' : 'สร้างบัญชีใหม่'}</h1>
 
