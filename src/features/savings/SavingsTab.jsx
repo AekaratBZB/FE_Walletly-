@@ -26,9 +26,12 @@ export const SavingsTab = () => {
   const totalTarget = savingsGoals.reduce((sum, g) => sum + (Number(g.targetAmount) || 0), 0);
 
   // Emergency Fund Calculations
-  const monthlyIncome = Number(allocationSettings.monthlyIncome) || 50000;
+  const monthlyIncome = Number(allocationSettings.monthlyIncome) || 0;
   const totalFixedCosts = fixedCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-  const monthlyEssentialSpend = totalFixedCosts + Math.max(10000, monthlyIncome * 0.25);
+  // Variable-spend estimate (with 10k floor) only applies once income is known
+  const estimatedVariableSpend = monthlyIncome > 0 ? Math.max(10000, monthlyIncome * 0.25) : 0;
+  const monthlyEssentialSpend = totalFixedCosts + estimatedVariableSpend;
+  const canCreateEmergencyGoal = monthlyEssentialSpend > 0;
 
   const ef3 = monthlyEssentialSpend * 3;
   const ef6 = monthlyEssentialSpend * 6;
@@ -253,7 +256,9 @@ export const SavingsTab = () => {
                 <span>คำนวณเงินสำรองฉุกเฉิน (Emergency Fund)</span>
               </div>
               <div className="card-subtitle">
-                คำนวณจากค่าใช้จ่ายจำเป็นเดือนละ {formatCurrency(Math.round(monthlyEssentialSpend))}
+                {canCreateEmergencyGoal
+                  ? `คำนวณจากค่าใช้จ่ายจำเป็นเดือนละ ${formatCurrency(Math.round(monthlyEssentialSpend))}`
+                  : 'กรอกรายได้ต่อเดือนหรือเพิ่มฟิกคอสก่อน เพื่อคำนวณเงินสำรองฉุกเฉิน'}
               </div>
             </div>
           </div>
@@ -265,6 +270,7 @@ export const SavingsTab = () => {
               <button
                 className="btn btn-outline btn-sm mt-2"
                 style={{ width: '100%', fontSize: '0.75rem', padding: '0.25rem 0.4rem' }}
+                disabled={!canCreateEmergencyGoal}
                 onClick={() => handleCreateEmergencyGoal(3)}
               >
                 + ตั้งเป้า 3 ด.
@@ -277,6 +283,7 @@ export const SavingsTab = () => {
               <button
                 className="btn btn-primary btn-sm mt-2"
                 style={{ width: '100%', fontSize: '0.75rem', padding: '0.25rem 0.4rem' }}
+                disabled={!canCreateEmergencyGoal}
                 onClick={() => handleCreateEmergencyGoal(6)}
               >
                 + ตั้งเป้า 6 ด.
@@ -289,6 +296,7 @@ export const SavingsTab = () => {
               <button
                 className="btn btn-outline btn-sm mt-2"
                 style={{ width: '100%', fontSize: '0.75rem', padding: '0.25rem 0.4rem' }}
+                disabled={!canCreateEmergencyGoal}
                 onClick={() => handleCreateEmergencyGoal(12)}
               >
                 + ตั้งเป้า 12 ด.

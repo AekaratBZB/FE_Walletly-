@@ -14,7 +14,7 @@ export const AllocationTab = () => {
 
   const currentPresetKey = allocationSettings.rule || '50-30-20';
   const currentPreset = ALLOCATION_PRESETS[currentPresetKey] || ALLOCATION_PRESETS['50-30-20'];
-  const monthlyIncome = Number(allocationSettings.monthlyIncome) || 50000;
+  const monthlyIncome = Number(allocationSettings.monthlyIncome) || 0;
 
   const currentMonthPrefix = getCurrentMonthPrefix();
   const totalFixedCosts = fixedCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
@@ -76,7 +76,7 @@ export const AllocationTab = () => {
               type="number"
               className="form-input num-font font-bold"
               placeholder="50000"
-              value={monthlyIncome}
+              value={monthlyIncome || ''}
               onChange={handleIncomeChange}
             />
             <div className="text-xs text-muted mt-1">ใช้คำนวณยอดเงินบาทของแต่ละสัดส่วน</div>
