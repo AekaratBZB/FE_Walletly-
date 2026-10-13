@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+import { consentsApi } from '../shared/api';
+
 const COOKIE_STORAGE_KEY = 'future_wallet_cookie_consent_v1';
 const POLICY_VERSION = '1.0';
 
@@ -8,6 +10,22 @@ const DEFAULT_CONSENT = {
   functional: true,
   analytics: true,
   marketing: true
+};
+
+const ANONYMOUS_ID_KEY = 'walletly_anonymous_id';
+
+// ID สุ่มที่เดาไม่ได้ (BE กำหนด 16-128 ตัวอักษร [A-Za-z0-9_-]) ใช้ผูก consent ของผู้ใช้ที่ยังไม่ล็อกอิน
+const getAnonymousId = () => {
+  try {
+    let id = localStorage.getItem(ANONYMOUS_ID_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(ANONYMOUS_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return crypto.randomUUID();
+  }
 };
 
 const CookieContext = createContext();
@@ -34,7 +52,7 @@ export const CookieProvider = ({ children }) => {
   const [isPolicyOpen, setIsPolicyOpen] = useState(false);
 
   // Helper to persist consent
-  const persistConsent = (preferences) => {
+  const persistConsent = async (preferences) => {
     const payload = {
       preferences: {
         necessary: true, // Always enforced
@@ -55,8 +73,23 @@ export const CookieProvider = ({ children }) => {
     setConsent(payload.preferences);
     setIsPreferencesOpen(false);
 
-    // Optional future backend audit hook:
-    // try { fetch('/api/privacy/consent-log', { method: 'POST', body: JSON.stringify(payload) }); } catch(err){}
+    // Sync to ASP.NET Core Backend Consents API (field ตรงกับ SaveConsentRequest ฝั่ง BE)
+    // ผู้ใช้ที่ยังไม่ล็อกอินต้องส่ง anonymousId; ถ้าล็อกอินแล้ว BE ผูกกับ userId จาก token แทน
+    try {
+      await consentsApi.save(
+        {
+          policyVersion: POLICY_VERSION,
+          consentNecessary: true,
+          consentFunctional: !!preferences.functional,
+          consentAnalytics: !!preferences.analytics,
+          consentMarketing: !!preferences.marketing
+        },
+        getAnonymousId()
+      );
+    } catch (err) {
+      // Non-blocking background sync
+      console.warn('Backend consent log sync skipped/offline:', err);
+    }
   };
 
   // 1. Accept All

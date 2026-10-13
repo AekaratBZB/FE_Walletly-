@@ -103,6 +103,32 @@ export const TransactionsTab = () => {
         </div>
       </div>
 
+      {/* API Source Proof Banner */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.5rem 0.85rem',
+          borderRadius: '8px',
+          background: 'rgba(16, 185, 129, 0.08)',
+          border: '1px solid rgba(16, 185, 129, 0.25)',
+          fontSize: '0.78rem',
+          color: '#10b981',
+          marginBottom: '1rem',
+          flexWrap: 'wrap',
+          gap: '6px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span>🟢</span>
+          <span><b>แหล่งข้อมูล:</b> ดึงสดจาก .NET Web API & SQL Server (https://localhost:7056/api/Transactions)</span>
+        </div>
+        <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>
+          โหลดข้อมูลจริง ({transactions.length} รายการในฐานข้อมูล)
+        </div>
+      </div>
+
       {/* Transactions Table Card */}
       <div className="card">
         <div className="table-container">
@@ -125,7 +151,7 @@ export const TransactionsTab = () => {
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📄</div>
                     <div style={{ fontWeight: 600 }}>ไม่พบรายการธุรกรรม</div>
                     <div style={{ fontSize: '0.85rem', marginTop: '4px' }}>
-                      กดปุ่ม "+ บันทึกรายการ" เพื่อเริ่มต้นบันทึกรายรับหรือรายจ่าย
+                      กดปุ่ม "+ บันทึกรายการ" เพื่อเริ่มต้นบันทึกรายรับหรือรายจ่ายเข้าฐานข้อมูล
                     </div>
                   </td>
                 </tr>
@@ -153,7 +179,27 @@ export const TransactionsTab = () => {
                         {formatDate(t.date)}
                       </td>
                       <td>{typeBadge}</td>
-                      <td style={{ fontWeight: 600 }}>{t.category}</td>
+                      <td style={{ fontWeight: 600 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{t.category}</span>
+                          {t.id && t.id.length > 25 && (
+                            <span
+                              style={{
+                                fontSize: '0.65rem',
+                                padding: '1px 5px',
+                                borderRadius: '4px',
+                                background: 'rgba(16, 185, 129, 0.12)',
+                                color: '#10b981',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                fontWeight: 500
+                              }}
+                              title={`รหัสจริงในฐานข้อมูล SQL Server: ${t.id}`}
+                            >
+                              SQL DB
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td>
                         <span
                           style={{

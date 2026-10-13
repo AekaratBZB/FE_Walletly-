@@ -95,6 +95,32 @@ export const SavingsTab = () => {
         </div>
       </div>
 
+      {/* API Source Proof Banner */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.5rem 0.85rem',
+          borderRadius: '8px',
+          background: 'rgba(168, 85, 247, 0.08)',
+          border: '1px solid rgba(168, 85, 247, 0.25)',
+          fontSize: '0.78rem',
+          color: '#a855f7',
+          marginBottom: '1rem',
+          flexWrap: 'wrap',
+          gap: '6px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span>🟢</span>
+          <span><b>แหล่งข้อมูล:</b> โหลดสดจาก .NET Web API & SQL Server (https://localhost:7056/api/savings-goals)</span>
+        </div>
+        <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>
+          โหลดข้อมูลจริง ({savingsGoals.length} เป้าหมายในฐานข้อมูล)
+        </div>
+      </div>
+
       {/* Top 2 Stat Cards */}
       <div className="grid grid-cols-2 mb-6">
         <StatCard

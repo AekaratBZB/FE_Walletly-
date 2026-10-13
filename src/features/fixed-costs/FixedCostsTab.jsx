@@ -80,6 +80,32 @@ export const FixedCostsTab = () => {
         </div>
       </div>
 
+      {/* API Source Proof Banner */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.5rem 0.85rem',
+          borderRadius: '8px',
+          background: 'rgba(59, 130, 246, 0.08)',
+          border: '1px solid rgba(59, 130, 246, 0.25)',
+          fontSize: '0.78rem',
+          color: '#3b82f6',
+          marginBottom: '1rem',
+          flexWrap: 'wrap',
+          gap: '6px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span>🟢</span>
+          <span><b>แหล่งข้อมูล:</b> โหลดสดจาก .NET Web API & SQL Server (https://localhost:7056/api/fixed-costs)</span>
+        </div>
+        <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>
+          โหลดข้อมูลจริง ({fixedCosts.length} รายการในฐานข้อมูล)
+        </div>
+      </div>
+
       {/* 4 Stat Cards */}
       <div className="grid grid-cols-4 mb-6">
         <StatCard

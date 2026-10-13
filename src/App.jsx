@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useWallet } from './context/WalletContext';
 import { useAuth } from './context/AuthContext';
 import { useCookieConsent } from './context/CookieContext';
@@ -19,9 +19,17 @@ import { TaxTab } from './features/tax';
 import { ReportsTab } from './features/reports';
 
 export const App = () => {
-  const { activeTab } = useWallet();
-  const { isAuthenticated } = useAuth();
+  const { activeTab, addToast } = useWallet();
+  const { isAuthenticated, emailVerification, clearEmailVerification } = useAuth();
   const { setIsPreferencesOpen, setIsPolicyOpen } = useCookieConsent();
+
+  // ยืนยันอีเมลสำเร็จแล้วเข้าสู่ระบบอัตโนมัติ: แจ้งผู้ใช้ในหน้าหลัก
+  useEffect(() => {
+    if (emailVerification?.status === 'success') {
+      addToast(emailVerification.message, 'success');
+      clearEmailVerification();
+    }
+  }, [emailVerification, addToast, clearEmailVerification]);
 
   const renderActiveTab = () => {
     switch (activeTab) {

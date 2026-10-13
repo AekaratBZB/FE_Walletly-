@@ -8,12 +8,12 @@ import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <WalletProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <WalletProvider>
         <CookieProvider>
           <App />
         </CookieProvider>
-      </AuthProvider>
-    </WalletProvider>
+      </WalletProvider>
+    </AuthProvider>
   </React.StrictMode>
 );

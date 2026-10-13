@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { DEMO_DATA } from '../shared/demoData';
 import { useTransactionsState } from '../features/transactions';
 import { useFixedCostsState } from '../features/fixed-costs';
@@ -6,12 +6,45 @@ import { useSavingsState } from '../features/savings';
 import { useTaxState } from '../features/tax';
 import { useAllocationState } from '../features/allocation';
 import { useDebtState, DEFAULT_BUDGET_PROFILE, buildPrefillProfile } from '../features/debt';
+import { categoriesApi, getStoredToken } from '../shared/api';
+import { useAuth } from './AuthContext';
 
 const WalletContext = createContext();
 
 export const WalletProvider = ({ children }) => {
+  // Current authenticated user from AuthContext
+  const { user } = useAuth();
+  const userId = user?.id;
+
   // Navigation State
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Categories loaded from Backend API
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    const token = getStoredToken();
+    if (!token || !userId) {
+      setCategories([]);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchCategories = async () => {
+      try {
+        const data = await categoriesApi.getAll();
+        if (isMounted && Array.isArray(data)) {
+          setCategories(data);
+        }
+      } catch (e) {
+        console.warn('Failed to load categories from API:', e);
+      }
+    };
+    fetchCategories();
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
 
   // Toasts System
   const [toasts, setToasts] = useState([]);
@@ -29,20 +62,23 @@ export const WalletProvider = ({ children }) => {
   };
 
   // Modular Feature Slices
-  const transactionsSlice = useTransactionsState({ addToast });
-  const fixedCostsSlice = useFixedCostsState({ addToast });
+  const transactionsSlice = useTransactionsState({ addToast, categories, userId });
+  const fixedCostsSlice = useFixedCostsState({ addToast, categories, userId });
   const savingsSlice = useSavingsState({
     addToast,
-    addTransaction: transactionsSlice.addTransaction
+    addTransaction: transactionsSlice.addTransaction,
+    reloadTransactions: transactionsSlice.reloadTransactions,
+    userId
   });
-  const taxSlice = useTaxState({ addToast });
-  const allocationSlice = useAllocationState();
+  const taxSlice = useTaxState({ addToast, userId });
+  const allocationSlice = useAllocationState({ userId });
   const debtSlice = useDebtState({
     addToast,
     allocationSettings: allocationSlice.allocationSettings,
     fixedCosts: fixedCostsSlice.fixedCosts,
     savingsGoals: savingsSlice.savingsGoals,
-    transactions: transactionsSlice.transactions
+    transactions: transactionsSlice.transactions,
+    userId
   });
 
   // Cross-Cutting: Export / Import / Reset
@@ -182,6 +218,7 @@ export const WalletProvider = ({ children }) => {
         exportTransactionsCSV,
         resetToDemo,
         clearAllData,
+        categories,
         ...transactionsSlice,
         ...fixedCostsSlice,
         ...savingsSlice,
