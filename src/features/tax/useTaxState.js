@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { DEMO_DATA } from '../../shared/demoData';
-import { loadTaxSettings, saveTaxSettings } from './taxStorage';
+import { EMPTY_TAX_SETTINGS, loadTaxSettings, saveTaxSettings } from './taxStorage';
 import { taxesApi, getStoredToken } from '../../shared/api';
 
 export const useTaxState = ({ addToast, userId } = {}) => {
-  const [taxSettings, setTaxSettings] = useState(() => loadTaxSettings());
+  const [taxSettings, setTaxSettings] = useState(() =>
+    getStoredToken() ? { ...EMPTY_TAX_SETTINGS } : loadTaxSettings()
+  );
   const [isLoadingTax, setIsLoadingTax] = useState(false);
 
   useEffect(() => {
@@ -26,11 +27,10 @@ export const useTaxState = ({ addToast, userId } = {}) => {
       try {
         setIsLoadingTax(true);
         const res = await taxesApi.getSetting(taxSettings.taxYear || 2026);
-        if (isMounted && res) {
-          setTaxSettings(prev => ({
-            ...prev,
-            ...res
-          }));
+        // Start from an empty form, not the previous local state, so another
+        // account's (or demo) values never bleed into this user's form.
+        if (isMounted && res && typeof res === 'object') {
+          setTaxSettings({ ...EMPTY_TAX_SETTINGS, ...res });
         }
       } catch (err) {
         console.warn('Failed to fetch tax settings from API, using local:', err);
@@ -60,11 +60,11 @@ export const useTaxState = ({ addToast, userId } = {}) => {
   };
 
   const resetTaxSettings = async () => {
-    setTaxSettings(DEMO_DATA.taxSettings);
+    setTaxSettings({ ...EMPTY_TAX_SETTINGS });
     const token = getStoredToken();
     if (token) {
       try {
-        await taxesApi.saveSetting(DEMO_DATA.taxSettings);
+        await taxesApi.saveSetting(EMPTY_TAX_SETTINGS);
       } catch (err) {
         console.warn('Failed to reset tax settings in BE:', err);
       }

@@ -14,6 +14,8 @@ export const TAX_BRACKETS = [
   { min: 5000000, max: Infinity, rate: 0.35, label: 'เกิน 5,000,000 บาทขึ้นไป (35%)' }
 ];
 
+export const PERSONAL_ALLOWANCE = 60000;
+
 export const calculateThaiTax = (s = {}) => {
   // 1. Total Income
   const grossIncome = (Number(s.annualSalary) || 0) + (Number(s.annualBonus) || 0) + (Number(s.freelanceIncome) || 0);
@@ -22,7 +24,7 @@ export const calculateThaiTax = (s = {}) => {
   const expenseDeduction = Math.min(100000, grossIncome * 0.5);
 
   // 3. Deductions & Allowances
-  const personalAllowance = 60000;
+  const personalAllowance = PERSONAL_ALLOWANCE;
   const parentAllowance = Math.min(120000, (Number(s.parentCount) || 0) * 30000);
   const childAllowance = (Number(s.childCount) || 0) * 30000;
   const socialSecurityDeduction = Math.min(9000, Number(s.socialSecurity) || 0);

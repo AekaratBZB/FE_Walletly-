@@ -96,9 +96,8 @@ export const AllocationTab = () => {
             actualSpent = thisMonthExpenses * 0.5;
           } else if (b.key === 'savings' || b.key === 'ffa' || b.key === 'ltss') {
             actualSpent = thisMonthSavings;
-          } else {
-            actualSpent = targetBudget * 0.5;
           }
+          // Other buckets (invest/edu/give) have no tracked spending yet: show 0, not a guess
 
           const progressPercent = targetBudget > 0 ? Math.min(100, Math.round((actualSpent / targetBudget) * 100)) : 0;
           const remainingBudget = targetBudget - actualSpent;
@@ -106,7 +105,10 @@ export const AllocationTab = () => {
           let statusColor = 'var(--primary)';
           let statusText = `เหลืองบ ${formatCurrency(Math.round(remainingBudget))}`;
 
-          if (actualSpent > targetBudget) {
+          if (monthlyIncome <= 0) {
+            statusColor = 'var(--text-muted)';
+            statusText = 'กรอกรายได้เพื่อคำนวณงบ';
+          } else if (actualSpent > targetBudget) {
             statusColor = 'var(--danger)';
             statusText = `เกินงบ ${formatCurrency(Math.round(Math.abs(remainingBudget)))}`;
           } else if (progressPercent >= 80) {

@@ -4,6 +4,8 @@ import { useTransactionsState } from '../features/transactions';
 import { useFixedCostsState } from '../features/fixed-costs';
 import { useSavingsState } from '../features/savings';
 import { useTaxState } from '../features/tax';
+import { EMPTY_TAX_SETTINGS } from '../features/tax/taxStorage';
+import { EMPTY_ALLOCATION_SETTINGS } from '../features/allocation/allocationStorage';
 import { useAllocationState } from '../features/allocation';
 import { useDebtState, DEFAULT_BUDGET_PROFILE, buildPrefillProfile } from '../features/debt';
 import { categoriesApi, getStoredToken } from '../shared/api';
@@ -173,33 +175,8 @@ export const WalletProvider = ({ children }) => {
     transactionsSlice.setTransactions([]);
     fixedCostsSlice.setFixedCosts([]);
     savingsSlice.setSavingsGoals([]);
-    allocationSlice.setAllocationSettings({
-      rule: '50-30-20',
-      monthlyIncome: 0,
-      buckets: { needs: 50, wants: 30, savings: 20 }
-    });
-    taxSlice.setTaxSettings({
-      taxYear: 2026,
-      annualSalary: 0,
-      annualBonus: 0,
-      freelanceIncome: 0,
-      socialSecurity: 0,
-      personalDeduction: 60000,
-      spouseDeduction: 0,
-      childCount: 0,
-      parentCount: 0,
-      lifeInsurance: 0,
-      healthInsurance: 0,
-      ssfAmount: 0,
-      rmfAmount: 0,
-      thaiEsgAmount: 0,
-      providentFund: 0,
-      mortgageInterest: 0,
-      easyReceipt: 0,
-      donationGeneral: 0,
-      donationEducation: 0,
-      withholdingTax: 0
-    });
+    allocationSlice.setAllocationSettings({ ...EMPTY_ALLOCATION_SETTINGS });
+    taxSlice.setTaxSettings({ ...EMPTY_TAX_SETTINGS });
     debtSlice.setDebts([]);
     debtSlice.setBudgetProfile(DEFAULT_BUDGET_PROFILE);
     addToast('ล้างข้อมูลทั้งหมดในระบบเรียบร้อยแล้ว', 'info');

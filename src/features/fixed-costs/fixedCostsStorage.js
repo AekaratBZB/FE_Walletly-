@@ -1,4 +1,3 @@
-import { DEMO_DATA } from '../../shared/demoData';
 
 const STORAGE_KEYS = {
   FIXED_COSTS: 'finsmart_fixed_costs_v1'
@@ -15,8 +14,8 @@ const read = (key, fallback) => {
 };
 
 export const loadFixedCosts = () => {
-  const data = read(STORAGE_KEYS.FIXED_COSTS, DEMO_DATA.fixedCosts);
-  return Array.isArray(data) ? data : DEMO_DATA.fixedCosts;
+  const data = read(STORAGE_KEYS.FIXED_COSTS, []);
+  return Array.isArray(data) ? data : [];
 };
 
 export const saveFixedCosts = (fixedCosts) => {

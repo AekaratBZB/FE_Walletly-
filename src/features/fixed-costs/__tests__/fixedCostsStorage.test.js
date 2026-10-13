@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { loadFixedCosts, saveFixedCosts } from '../fixedCostsStorage';
-import { DEMO_DATA } from '../../../shared/demoData';
 
 describe('fixedCostsStorage', () => {
   beforeEach(() => {
@@ -12,9 +11,9 @@ describe('fixedCostsStorage', () => {
     };
   });
 
-  it('loads fallback demo data when empty', () => {
+  it('returns an empty list when nothing is stored', () => {
     const data = loadFixedCosts();
-    expect(data).toEqual(DEMO_DATA.fixedCosts);
+    expect(data).toEqual([]);
   });
 
   it('persists and retrieves fixed costs correctly', () => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { StatCard } from '../../components/StatCard';
-import { formatCurrency } from '../../shared/formatters';
+import { formatCurrency, getCurrentMonthPrefix } from '../../shared/formatters';
 import {
   Target,
   PiggyBank,
@@ -15,7 +15,7 @@ export const SavingsTab = () => {
   const {
     savingsGoals,
     fixedCosts,
-    allocationSettings,
+    transactions,
     setIsAddGoalOpen,
     setQuickDepositGoal,
     deleteSavingsGoal,
@@ -25,12 +25,13 @@ export const SavingsTab = () => {
   const totalSaved = savingsGoals.reduce((sum, g) => sum + (Number(g.currentAmount) || 0), 0);
   const totalTarget = savingsGoals.reduce((sum, g) => sum + (Number(g.targetAmount) || 0), 0);
 
-  // Emergency Fund Calculations
-  const monthlyIncome = Number(allocationSettings.monthlyIncome) || 0;
+  // Emergency Fund Calculations: fixed costs + this month's actual recorded expenses
   const totalFixedCosts = fixedCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-  // Variable-spend estimate (with 10k floor) only applies once income is known
-  const estimatedVariableSpend = monthlyIncome > 0 ? Math.max(10000, monthlyIncome * 0.25) : 0;
-  const monthlyEssentialSpend = totalFixedCosts + estimatedVariableSpend;
+  const currentMonthPrefix = getCurrentMonthPrefix();
+  const thisMonthExpenses = transactions
+    .filter(t => t.type === 'expense' && (t.date || '').startsWith(currentMonthPrefix))
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+  const monthlyEssentialSpend = totalFixedCosts + thisMonthExpenses;
   const canCreateEmergencyGoal = monthlyEssentialSpend > 0;
 
   const ef3 = monthlyEssentialSpend * 3;
@@ -57,10 +58,10 @@ export const SavingsTab = () => {
   };
 
   // Compound Interest State
-  const [ciInitial, setCiInitial] = useState('10000');
-  const [ciMonthly, setCiMonthly] = useState('5000');
-  const [ciRate, setCiRate] = useState('8');
-  const [ciYears, setCiYears] = useState('10');
+  const [ciInitial, setCiInitial] = useState('');
+  const [ciMonthly, setCiMonthly] = useState('');
+  const [ciRate, setCiRate] = useState('');
+  const [ciYears, setCiYears] = useState('');
 
   const initial = parseFloat(ciInitial) || 0;
   const monthly = parseFloat(ciMonthly) || 0;
@@ -95,32 +96,6 @@ export const SavingsTab = () => {
             <Plus size={14} />
             <span>+ ตั้งเป้าหมายใหม่</span>
           </button>
-        </div>
-      </div>
-
-      {/* API Source Proof Banner */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0.5rem 0.85rem',
-          borderRadius: '8px',
-          background: 'rgba(168, 85, 247, 0.08)',
-          border: '1px solid rgba(168, 85, 247, 0.25)',
-          fontSize: '0.78rem',
-          color: '#a855f7',
-          marginBottom: '1rem',
-          flexWrap: 'wrap',
-          gap: '6px'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span>🟢</span>
-          <span><b>แหล่งข้อมูล:</b> โหลดสดจาก .NET Web API & SQL Server (https://localhost:7056/api/savings-goals)</span>
-        </div>
-        <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>
-          โหลดข้อมูลจริง ({savingsGoals.length} เป้าหมายในฐานข้อมูล)
         </div>
       </div>
 
@@ -325,6 +300,7 @@ export const SavingsTab = () => {
                 className="form-input num-font"
                 style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
                 value={ciInitial}
+                placeholder="10000"
                 onChange={(e) => setCiInitial(e.target.value)}
               />
             </div>
@@ -335,6 +311,7 @@ export const SavingsTab = () => {
                 className="form-input num-font"
                 style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
                 value={ciMonthly}
+                placeholder="5000"
                 onChange={(e) => setCiMonthly(e.target.value)}
               />
             </div>
@@ -345,6 +322,7 @@ export const SavingsTab = () => {
                 className="form-input num-font"
                 style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
                 value={ciRate}
+                placeholder="8"
                 onChange={(e) => setCiRate(e.target.value)}
               />
             </div>
@@ -355,6 +333,7 @@ export const SavingsTab = () => {
                 className="form-input num-font"
                 style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
                 value={ciYears}
+                placeholder="10"
                 onChange={(e) => setCiYears(e.target.value)}
               />
             </div>

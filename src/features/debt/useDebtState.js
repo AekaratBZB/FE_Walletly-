@@ -4,7 +4,8 @@ import {
   saveDebts,
   loadBudgetProfile,
   saveBudgetProfile,
-  buildPrefillProfile
+  buildPrefillProfile,
+  DEFAULT_BUDGET_PROFILE
 } from './debtStorage';
 import { debtsApi, getStoredToken } from '../../shared/api';
 
@@ -87,10 +88,13 @@ export const useDebtState = ({
   const token = getStoredToken();
   const [debts, setDebts] = useState(() => (token ? [] : loadDebts()));
 
-  const [budgetProfile, setBudgetProfile] = useState(
-    () =>
-      loadBudgetProfile() ||
-      buildPrefillProfile({ allocationSettings, fixedCosts, savingsGoals, transactions })
+  // Logged-in users get their profile from the API; never prefill it from
+  // whatever happens to be in local state on first render.
+  const [budgetProfile, setBudgetProfile] = useState(() =>
+    token
+      ? loadBudgetProfile() || DEFAULT_BUDGET_PROFILE
+      : loadBudgetProfile() ||
+        buildPrefillProfile({ allocationSettings, fixedCosts, savingsGoals, transactions })
   );
 
   const [isAddDebtOpen, setIsAddDebtOpen] = useState(false);
@@ -134,11 +138,15 @@ export const useDebtState = ({
 
         if (isMounted && apiProfile.status === 'fulfilled' && apiProfile.value) {
           const p = apiProfile.value;
+          // Server values win, including 0. Only the schedule overrides are
+          // local-only, so they are the only fields kept from prev.
           setBudgetProfile(prev => ({
-            ...prev,
-            netMonthlyIncome: Number(p.netMonthlyIncome) || prev.netMonthlyIncome,
-            fixedExpenses: Number(p.fixedExpenses) || prev.fixedExpenses,
-            discretionaryBudget: Number(p.discretionaryBudget) || prev.discretionaryBudget,
+            ...DEFAULT_BUDGET_PROFILE,
+            emergencyContributionOverrides: prev.emergencyContributionOverrides || [],
+            bufferOverrides: prev.bufferOverrides || [],
+            netMonthlyIncome: Number(p.netMonthlyIncome) || 0,
+            fixedExpenses: Number(p.fixedExpenses) || 0,
+            discretionaryBudget: Number(p.discretionaryBudget) || 0,
             extraIncome: Number(p.extraIncome) || 0,
             emergencyFundCurrent: Number(p.emergencyFundCurrent) || 0,
             emergencyFundTarget: Number(p.emergencyFundTarget) || 0,

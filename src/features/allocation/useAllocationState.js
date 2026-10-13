@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { loadAllocationSettings, saveAllocationSettings } from './allocationStorage';
+import { EMPTY_ALLOCATION_SETTINGS, loadAllocationSettings, saveAllocationSettings } from './allocationStorage';
 import { allocationsApi, getStoredToken } from '../../shared/api';
 
 const INCOME_SYNC_DELAY_MS = 800;
 
 export const useAllocationState = ({ userId } = {}) => {
-  const [allocationSettings, setAllocationSettings] = useState(() => loadAllocationSettings());
+  const [allocationSettings, setAllocationSettings] = useState(() =>
+    getStoredToken() ? { ...EMPTY_ALLOCATION_SETTINGS } : loadAllocationSettings()
+  );
   const [isLoadingAllocations, setIsLoadingAllocations] = useState(false);
   const incomeSyncTimer = useRef(null);
 
@@ -37,12 +39,14 @@ export const useAllocationState = ({ userId } = {}) => {
               bucketsObj[b.bucketKey] = Number(b.targetPercent) || 0;
             });
           }
-          setAllocationSettings(prev => ({
-            ...prev,
-            rule: res.ruleKey || prev.rule,
-            monthlyIncome: Number(res.monthlyIncome) || prev.monthlyIncome,
-            buckets: Object.keys(bucketsObj).length > 0 ? bucketsObj : prev.buckets
-          }));
+          // Build from empty defaults, not prev, so a stale local value never
+          // survives a server income of 0.
+          setAllocationSettings({
+            ...EMPTY_ALLOCATION_SETTINGS,
+            rule: res.ruleKey || EMPTY_ALLOCATION_SETTINGS.rule,
+            monthlyIncome: Number(res.monthlyIncome) || 0,
+            buckets: Object.keys(bucketsObj).length > 0 ? bucketsObj : EMPTY_ALLOCATION_SETTINGS.buckets
+          });
         }
       } catch (err) {
         console.warn('Failed to fetch allocations from API, using local:', err);

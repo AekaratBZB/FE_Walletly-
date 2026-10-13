@@ -36,7 +36,7 @@ export const useTransactionsState = ({ addToast, categories = [], userId } = {})
       category: dto.categoryName || 'ทั่วไป',
       categoryId: dto.categoryId,
       amount: Number(dto.amount) || 0,
-      paymentMethod: dto.paymentMethodName || 'เงินสด',
+      paymentMethod: dto.paymentMethodName || '',
       note: dto.note || ''
     }));
   };

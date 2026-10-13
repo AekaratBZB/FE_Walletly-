@@ -105,7 +105,7 @@ export const DashboardTab = () => {
         <StatCard
           label="ฟิกคอสประจำเดือน"
           value={formatCurrency(totalFixedCosts)}
-          subtext={unpaidFixedCosts > 0 ? `รอจ่าย ${formatCurrency(unpaidFixedCosts)}` : '✓ จ่ายครบแล้ว'}
+          subtext={fixedCosts.length === 0 ? 'ยังไม่มีฟิกคอส' : unpaidFixedCosts > 0 ? `รอจ่าย ${formatCurrency(unpaidFixedCosts)}` : '✓ จ่ายครบแล้ว'}
           icon={CalendarClock}
           colorScheme="amber"
           valueClass="text-warning"

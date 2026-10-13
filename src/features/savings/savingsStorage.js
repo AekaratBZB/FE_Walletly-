@@ -1,4 +1,3 @@
-import { DEMO_DATA } from '../../shared/demoData';
 
 const STORAGE_KEYS = {
   SAVINGS_GOALS: 'finsmart_savings_goals_v1'
@@ -15,8 +14,8 @@ const read = (key, fallback) => {
 };
 
 export const loadSavingsGoals = () => {
-  const data = read(STORAGE_KEYS.SAVINGS_GOALS, DEMO_DATA.savingsGoals);
-  return Array.isArray(data) ? data : DEMO_DATA.savingsGoals;
+  const data = read(STORAGE_KEYS.SAVINGS_GOALS, []);
+  return Array.isArray(data) ? data : [];
 };
 
 export const saveSavingsGoals = (savingsGoals) => {

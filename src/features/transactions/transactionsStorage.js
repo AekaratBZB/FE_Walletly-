@@ -1,4 +1,3 @@
-import { DEMO_DATA } from '../../shared/demoData';
 
 const STORAGE_KEYS = {
   TRANSACTIONS: 'finsmart_transactions_v1'
@@ -15,8 +14,8 @@ const read = (key, fallback) => {
 };
 
 export const loadTransactions = () => {
-  const data = read(STORAGE_KEYS.TRANSACTIONS, DEMO_DATA.transactions);
-  return Array.isArray(data) ? data : DEMO_DATA.transactions;
+  const data = read(STORAGE_KEYS.TRANSACTIONS, []);
+  return Array.isArray(data) ? data : [];
 };
 
 export const saveTransactions = (transactions) => {

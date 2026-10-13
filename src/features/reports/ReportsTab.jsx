@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { useWallet } from '../../context/WalletContext';
+import { getStoredToken } from '../../shared/api';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -43,6 +44,7 @@ export const ReportsTab = () => {
   } = useWallet();
 
   const fileInputRef = useRef(null);
+  const isLoggedIn = !!getStoredToken();
 
   // 1. Doughnut Chart: Category Breakdown
   const categoryTotals = {};
@@ -161,6 +163,8 @@ export const ReportsTab = () => {
                 plugins: {
                   legend: { position: 'bottom', labels: { font: { family: 'Prompt', size: 11 } } },
                   tooltip: {
+                    // Placeholder slice when empty: no tooltip, it is not a real amount
+                    enabled: doughnutLabels.length > 0,
                     callbacks: {
                       label: (ctx) => ` ${ctx.label}: ${(ctx.raw || 0).toLocaleString()} ฿`
                     }
@@ -251,7 +255,9 @@ export const ReportsTab = () => {
           <div>
             <div className="card-title">💾 สำรองข้อมูล & กู้คืนระบบ (Data Management & Backup)</div>
             <div className="card-subtitle">
-              ข้อมูลทั้งหมดถูกเก็บอย่างปลอดภัยบนเครื่องของคุณ (Browser LocalStorage)
+              {isLoggedIn
+                ? 'ส่งออกหรือสำรองข้อมูลบัญชีของคุณเป็นไฟล์ CSV / JSON'
+                : 'ข้อมูลทั้งหมดถูกเก็บอย่างปลอดภัยบนเครื่องของคุณ (Browser LocalStorage)'}
             </div>
           </div>
         </div>
@@ -279,10 +285,14 @@ export const ReportsTab = () => {
             />
           </label>
 
-          <button className="btn btn-outline" onClick={handleResetDemo}>
-            <RotateCcw size={16} />
-            <span>โหลด Demo Data</span>
-          </button>
+          {/* Demo data only lives locally and never syncs, so it would mix
+              fake rows into a real account */}
+          {!isLoggedIn && (
+            <button className="btn btn-outline" onClick={handleResetDemo}>
+              <RotateCcw size={16} />
+              <span>โหลด Demo Data</span>
+            </button>
+          )}
         </div>
 
         <div className="mt-4 pt-3 flex justify-between items-center" style={{ borderTop: '1px solid var(--border-light)' }}>

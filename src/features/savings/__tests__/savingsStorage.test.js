@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { loadSavingsGoals, saveSavingsGoals } from '../savingsStorage';
-import { DEMO_DATA } from '../../../shared/demoData';
 
 describe('savingsStorage', () => {
   beforeEach(() => {
@@ -12,9 +11,9 @@ describe('savingsStorage', () => {
     };
   });
 
-  it('loads fallback demo data when empty', () => {
+  it('returns an empty list when nothing is stored', () => {
     const data = loadSavingsGoals();
-    expect(data).toEqual(DEMO_DATA.savingsGoals);
+    expect(data).toEqual([]);
   });
 
   it('persists and retrieves savings goals correctly', () => {

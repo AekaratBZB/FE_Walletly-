@@ -90,7 +90,16 @@ export const ProjectionTab = () => {
       return;
     }
 
-    const disposableIncome = Math.max(1, monthlyIncome - totalFixedCosts);
+    if (monthlyIncome - totalFixedCosts <= 0) {
+      alert(
+        monthlyIncome <= 0
+          ? 'กรุณากรอกรายได้ต่อเดือนในแท็บแบ่งสัดส่วนก่อนจำลองการซื้อ'
+          : 'ฟิกคอสเท่ากับหรือเกินรายได้ต่อเดือนแล้ว ไม่มีเงินอิสระเหลือสำหรับการซื้อนี้'
+      );
+      return;
+    }
+
+    const disposableIncome = monthlyIncome - totalFixedCosts;
     const monthlyPayment = months > 1 ? price / months : price;
     const impactRatio = (monthlyPayment / disposableIncome) * 100;
 

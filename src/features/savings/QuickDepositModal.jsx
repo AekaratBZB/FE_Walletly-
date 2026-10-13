@@ -5,7 +5,7 @@ import { formatCurrency } from '../../shared/formatters';
 
 export const QuickDepositModal = () => {
   const { quickDepositGoal, setQuickDepositGoal, depositToSavingsGoal } = useWallet();
-  const [amount, setAmount] = useState('5000');
+  const [amount, setAmount] = useState('');
 
   if (!quickDepositGoal) return null;
 
@@ -19,7 +19,7 @@ export const QuickDepositModal = () => {
 
     depositToSavingsGoal(quickDepositGoal.id, numAmount, quickDepositGoal.title);
     setQuickDepositGoal(null);
-    setAmount('5000');
+    setAmount('');
   };
 
   return (

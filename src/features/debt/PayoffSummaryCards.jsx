@@ -65,7 +65,9 @@ export const PayoffSummaryCards = ({ projection, budgetProfile, debts }) => {
           subtext={
             projection.IsInfeasible
               ? 'งบปัจจุบันยังปิดหนี้ไม่ได้'
-              : `อีก ${projection.MonthsToPayoff} เดือน`
+              : !projection.MonthsToPayoff
+                ? 'ยังไม่มีหนี้ที่ต้องปิด'
+                : `อีก ${projection.MonthsToPayoff} เดือน`
           }
           icon={CalendarCheck}
           colorScheme={projection.IsInfeasible ? 'rose' : 'emerald'}

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { loadTransactions, saveTransactions } from '../transactionsStorage';
-import { DEMO_DATA } from '../../../shared/demoData';
 
 describe('transactionsStorage', () => {
   beforeEach(() => {
@@ -14,7 +13,7 @@ describe('transactionsStorage', () => {
 
   it('loads fallback demo data when localStorage is empty', () => {
     const data = loadTransactions();
-    expect(data).toEqual(DEMO_DATA.transactions);
+    expect(data).toEqual([]);
   });
 
   it('saves and reloads transactions correctly', () => {

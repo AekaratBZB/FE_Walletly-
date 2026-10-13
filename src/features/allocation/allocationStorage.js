@@ -1,7 +1,11 @@
-import { DEMO_DATA } from '../../shared/demoData';
-
 const STORAGE_KEYS = {
   ALLOCATION_SETTINGS: 'finsmart_allocation_v1'
+};
+
+export const EMPTY_ALLOCATION_SETTINGS = {
+  rule: '50-30-20',
+  monthlyIncome: 0,
+  buckets: { needs: 50, wants: 30, savings: 20 }
 };
 
 const read = (key, fallback) => {
@@ -15,8 +19,8 @@ const read = (key, fallback) => {
 };
 
 export const loadAllocationSettings = () => {
-  const data = read(STORAGE_KEYS.ALLOCATION_SETTINGS, DEMO_DATA.allocationSettings);
-  return data && typeof data === 'object' ? data : DEMO_DATA.allocationSettings;
+  const data = read(STORAGE_KEYS.ALLOCATION_SETTINGS, null);
+  return data && typeof data === 'object' ? data : { ...EMPTY_ALLOCATION_SETTINGS };
 };
 
 export const saveAllocationSettings = (allocationSettings) => {

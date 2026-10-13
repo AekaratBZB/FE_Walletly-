@@ -1,6 +1,6 @@
 import React from 'react';
 import { useWallet } from '../../context/WalletContext';
-import { calculateThaiTax } from './taxCalculator';
+import { calculateThaiTax, PERSONAL_ALLOWANCE } from './taxCalculator';
 import { formatCurrency } from '../../shared/formatters';
 import { RotateCcw, Receipt } from 'lucide-react';
 import './tax.css';
@@ -9,6 +9,7 @@ export const TaxTab = () => {
   const { taxSettings, updateTaxSettings, resetTaxSettings } = useWallet();
 
   const res = calculateThaiTax(taxSettings);
+  const hasIncome = res.grossIncome > 0;
 
   const handleChange = (field, val) => {
     updateTaxSettings({ [field]: parseFloat(val) || 0 });
@@ -61,7 +62,8 @@ export const TaxTab = () => {
                 <input
                   type="number"
                   className="form-input num-font"
-                  value={taxSettings.annualSalary ?? 0}
+                  value={taxSettings.annualSalary || ''}
+                  placeholder="0"
                   onChange={(e) => handleChange('annualSalary', e.target.value)}
                 />
               </div>
@@ -70,7 +72,8 @@ export const TaxTab = () => {
                 <input
                   type="number"
                   className="form-input num-font"
-                  value={taxSettings.annualBonus ?? 0}
+                  value={taxSettings.annualBonus || ''}
+                  placeholder="0"
                   onChange={(e) => handleChange('annualBonus', e.target.value)}
                 />
               </div>
@@ -79,7 +82,8 @@ export const TaxTab = () => {
                 <input
                   type="number"
                   className="form-input num-font"
-                  value={taxSettings.freelanceIncome ?? 0}
+                  value={taxSettings.freelanceIncome || ''}
+                  placeholder="0"
                   onChange={(e) => handleChange('freelanceIncome', e.target.value)}
                 />
               </div>
@@ -91,6 +95,10 @@ export const TaxTab = () => {
             <h4 className="text-sm font-semibold text-primary mb-2">
               2. ค่าลดหย่อนส่วนตัว & ครอบครัว
             </h4>
+            <div className="flex justify-between items-center text-xs mb-3 p-2" style={{ background: 'var(--primary-light)', borderRadius: 'var(--radius-md)' }}>
+              <span className="text-muted">ลดหย่อนส่วนตัว (ได้อัตโนมัติทุกคน):</span>
+              <span className="font-semibold num-font text-primary">{formatCurrency(PERSONAL_ALLOWANCE)}</span>
+            </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="text-xs font-medium text-muted block mb-1">ประกันสังคม (สูงสุด 9,000 ฿):</label>
@@ -98,7 +106,8 @@ export const TaxTab = () => {
                   type="number"
                   className="form-input num-font"
                   max="9000"
-                  value={taxSettings.socialSecurity ?? 9000}
+                  value={taxSettings.socialSecurity || ''}
+                  placeholder="0"
                   onChange={(e) => handleChange('socialSecurity', e.target.value)}
                 />
               </div>
@@ -122,7 +131,8 @@ export const TaxTab = () => {
                   type="number"
                   min="0"
                   className="form-input num-font"
-                  value={taxSettings.childCount ?? 0}
+                  value={taxSettings.childCount || ''}
+                  placeholder="0"
                   onChange={(e) => handleIntChange('childCount', e.target.value)}
                 />
               </div>
@@ -140,7 +150,8 @@ export const TaxTab = () => {
                 <input
                   type="number"
                   className="form-input num-font"
-                  value={taxSettings.lifeInsurance ?? 0}
+                  value={taxSettings.lifeInsurance || ''}
+                  placeholder="0"
                   onChange={(e) => handleChange('lifeInsurance', e.target.value)}
                 />
               </div>
@@ -149,7 +160,8 @@ export const TaxTab = () => {
                 <input
                   type="number"
                   className="form-input num-font"
-                  value={taxSettings.healthInsurance ?? 0}
+                  value={taxSettings.healthInsurance || ''}
+                  placeholder="0"
                   onChange={(e) => handleChange('healthInsurance', e.target.value)}
                 />
               </div>
@@ -158,7 +170,8 @@ export const TaxTab = () => {
                 <input
                   type="number"
                   className="form-input num-font"
-                  value={taxSettings.providentFund ?? 0}
+                  value={taxSettings.providentFund || ''}
+                  placeholder="0"
                   onChange={(e) => handleChange('providentFund', e.target.value)}
                 />
               </div>
@@ -170,7 +183,8 @@ export const TaxTab = () => {
                 <input
                   type="number"
                   className="form-input num-font"
-                  value={taxSettings.ssfAmount ?? 0}
+                  value={taxSettings.ssfAmount || ''}
+                  placeholder="0"
                   onChange={(e) => handleChange('ssfAmount', e.target.value)}
                 />
               </div>
@@ -179,7 +193,8 @@ export const TaxTab = () => {
                 <input
                   type="number"
                   className="form-input num-font"
-                  value={taxSettings.rmfAmount ?? 0}
+                  value={taxSettings.rmfAmount || ''}
+                  placeholder="0"
                   onChange={(e) => handleChange('rmfAmount', e.target.value)}
                 />
               </div>
@@ -188,7 +203,8 @@ export const TaxTab = () => {
                 <input
                   type="number"
                   className="form-input num-font"
-                  value={taxSettings.thaiEsgAmount ?? 0}
+                  value={taxSettings.thaiEsgAmount || ''}
+                  placeholder="0"
                   onChange={(e) => handleChange('thaiEsgAmount', e.target.value)}
                 />
               </div>
@@ -206,7 +222,8 @@ export const TaxTab = () => {
                 <input
                   type="number"
                   className="form-input num-font"
-                  value={taxSettings.mortgageInterest ?? 0}
+                  value={taxSettings.mortgageInterest || ''}
+                  placeholder="0"
                   onChange={(e) => handleChange('mortgageInterest', e.target.value)}
                 />
               </div>
@@ -215,7 +232,8 @@ export const TaxTab = () => {
                 <input
                   type="number"
                   className="form-input num-font"
-                  value={taxSettings.easyReceipt ?? 0}
+                  value={taxSettings.easyReceipt || ''}
+                  placeholder="0"
                   onChange={(e) => handleChange('easyReceipt', e.target.value)}
                 />
               </div>
@@ -225,7 +243,8 @@ export const TaxTab = () => {
                   type="number"
                   className="form-input num-font font-bold"
                   style={{ borderColor: 'var(--secondary)' }}
-                  value={taxSettings.withholdingTax ?? 0}
+                  value={taxSettings.withholdingTax || ''}
+                  placeholder="0"
                   onChange={(e) => handleChange('withholdingTax', e.target.value)}
                 />
               </div>
@@ -245,6 +264,21 @@ export const TaxTab = () => {
             </div>
 
             {/* Refund / Due Status Banner */}
+            {!hasIncome ? (
+              <div
+                className="p-3 mb-3 text-center text-sm text-muted"
+                style={{ border: '1px dashed var(--border-light)', borderRadius: 'var(--radius-md)' }}
+              >
+                กรอกรายได้ทั้งปีเพื่อเริ่มคำนวณภาษี
+              </div>
+            ) : Math.round(res.finalDifference) === 0 ? (
+              <div
+                className="p-3 mb-3 text-center text-sm font-semibold text-primary"
+                style={{ background: 'var(--primary-light)', borderRadius: 'var(--radius-md)' }}
+              >
+                ไม่มีภาษีต้องชำระเพิ่ม และไม่มีเงินคืน
+              </div>
+            ) : (
             <div
               className="p-3 mb-3 text-center"
               style={{
@@ -270,6 +304,7 @@ export const TaxTab = () => {
                 {formatCurrency(Math.abs(Math.round(res.finalDifference)))}
               </div>
             </div>
+            )}
 
             {/* Breakdown List */}
             <div className="text-xs" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -279,11 +314,15 @@ export const TaxTab = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted">หักค่าใช้จ่าย 50% (สูงสุด 100k):</span>
-                <span className="font-semibold num-font text-danger">-{formatCurrency(Math.round(res.expenseDeduction))}</span>
+                <span className={`font-semibold num-font ${hasIncome ? 'text-danger' : 'text-muted'}`}>
+                  {hasIncome ? `-${formatCurrency(Math.round(res.expenseDeduction))}` : '-'}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted">หักค่าลดหย่อนรวม:</span>
-                <span className="font-semibold num-font text-danger">-{formatCurrency(Math.round(res.totalAllowances))}</span>
+                <span className="text-muted">หักค่าลดหย่อนรวม (รวมส่วนตัว 60k):</span>
+                <span className={`font-semibold num-font ${hasIncome ? 'text-danger' : 'text-muted'}`}>
+                  {hasIncome ? `-${formatCurrency(Math.round(res.totalAllowances))}` : '-'}
+                </span>
               </div>
               <div className="flex justify-between pt-2" style={{ borderTop: '1px solid var(--border-light)' }}>
                 <span className="text-main font-semibold">เงินได้สุทธิ (Net Taxable):</span>

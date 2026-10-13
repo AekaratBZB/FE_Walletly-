@@ -9,10 +9,10 @@ const PROVIDER_NAMES = { google: 'Google', facebook: 'Facebook' };
 
 export const clearMockLocalStorage = () => {
   try {
-    localStorage.removeItem('finsmart_transactions_v1');
-    localStorage.removeItem('finsmart_fixed_costs_v1');
-    localStorage.removeItem('finsmart_savings_goals_v1');
-    localStorage.removeItem('finsmart_debts_v1');
+    // Every per-user cache, so the next account never starts with this one's data
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('finsmart_'))
+      .forEach((key) => localStorage.removeItem(key));
   } catch (e) {
     console.error('Failed to clear mock storage:', e);
   }
