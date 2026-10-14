@@ -116,7 +116,7 @@ export const AuthProvider = ({ children }) => {
 
     const verifySession = async () => {
       try {
-        await healthApi.check();
+        await healthApi.warmUp();
         if (isMounted) setBackendStatus('connected');
 
         if (getStoredToken()) {
