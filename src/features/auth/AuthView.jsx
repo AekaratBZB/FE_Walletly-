@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useWallet } from '../../context/WalletContext';
 import { FutureWalletLogo } from './FutureWalletLogo';
@@ -16,6 +16,7 @@ export const AuthView = () => {
     loginAsGuest,
     savedEmail,
     isAuthLoading,
+    backendStatus,
     emailVerification,
     clearEmailVerification
   } = useAuth();
@@ -24,6 +25,17 @@ export const AuthView = () => {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [notice, setNotice] = useState(null); // { type, message } | null
   const [prefillEmail, setPrefillEmail] = useState(savedEmail || '');
+
+  // health check ยังไม่ตอบเกิน 1.5 วิ = BE น่าจะกำลัง cold start: บอกผู้ใช้แทนการค้างเงียบ
+  const [isBackendWaking, setIsBackendWaking] = useState(false);
+  useEffect(() => {
+    if (backendStatus !== 'checking') {
+      setIsBackendWaking(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => setIsBackendWaking(true), 1500);
+    return () => clearTimeout(timer);
+  }, [backendStatus]);
 
   const isLogin = mode === 'login';
 
@@ -78,6 +90,8 @@ export const AuthView = () => {
       ? { type: 'error', message: emailVerification.message, onClose: clearEmailVerification }
       : notice
       ? { ...notice, onClose: () => setNotice(null) }
+      : isBackendWaking
+      ? { type: 'info', message: 'กำลังเชื่อมต่อเซิร์ฟเวอร์... ครั้งแรกอาจใช้เวลาสักครู่' }
       : null;
 
   return (
