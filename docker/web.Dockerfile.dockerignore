@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+.git
+.claude
+.serena
+docs
+# .env* ทั้งหมด: กันค่า VITE_API_URL ของ Cloud Run และ secret หลุดเข้า image
+.env*
+docker/.env

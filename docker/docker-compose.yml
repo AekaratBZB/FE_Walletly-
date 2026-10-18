@@ -1,0 +1,68 @@
+# Walletly ทั้งระบบบนเครื่อง: FE (nginx) + BE (.NET) + SQL Server
+# วิธีใช้ดู docker/README.md
+name: walletly
+
+x-mssql-image: &mssql-image mcr.microsoft.com/mssql/server:2022-latest
+
+services:
+  db:
+    image: *mssql-image
+    environment:
+      ACCEPT_EULA: ${MSSQL_ACCEPT_EULA:?ตั้ง MSSQL_ACCEPT_EULA=Y ใน docker/.env หลังอ่าน license ของ SQL Server}
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?ตั้ง MSSQL_SA_PASSWORD ใน docker/.env}
+    volumes:
+      - db-data:/var/opt/mssql
+    # เปิดให้เครื่องนี้ต่อด้วย SSMS/Azure Data Studio ได้ (localhost,14333) ไม่เปิดออกนอกเครื่อง
+    ports:
+      - "127.0.0.1:${DB_PORT:-14333}:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -b -Q 'SELECT 1' -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  db-init:
+    image: *mssql-image
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["bash", "/init/init-db.sh"]
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?ตั้ง DB_APP_PASSWORD ใน docker/.env}
+    volumes:
+      - ./init-db.sh:/init/init-db.sh:ro
+      - ${BE_DIR:-../../BE_wallet_net}/database:/database:ro
+    restart: "no"
+
+  api:
+    build:
+      context: ${BE_DIR:-../../BE_wallet_net}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      ConnectionStrings__DefaultConnection: "Server=db,1433;Database=WalletlyDb;User ID=walletly_app;Password=${DB_APP_PASSWORD};TrustServerCertificate=True;"
+      JwtSettings__Secret: ${JWT_SECRET:?ตั้ง JWT_SECRET ใน docker/.env}
+      Cors__AllowedOrigins__0: http://localhost:${WEB_PORT:-8080}
+      # ไม่มี SMTP บนเครื่อง: ข้ามการยืนยันอีเมล และเขียนอีเมลลง log แทนการส่งจริง
+      Auth__RequireEmailVerification: "false"
+      Auth__EmailVerificationUrl: http://localhost:${WEB_PORT:-8080}/verify-email
+      Email__UseLoggingSender: "true"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/web.Dockerfile
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  db-data:
