@@ -1,0 +1,2 @@
+# shell script รันใน Linux container: ต้องเป็น LF เสมอ
+*.sh text eol=lf
