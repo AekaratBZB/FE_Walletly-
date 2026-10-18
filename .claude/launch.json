@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "walletly-dev-remote",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:remote"],
+      "port": 3000
     }
   ]
 }
