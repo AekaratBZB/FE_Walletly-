@@ -6,6 +6,9 @@
  * feature onto a REST API without touching the engine or the UI.
  */
 
+import { getCurrentMonthPrefix } from '../../shared/formatters';
+import { isFixedCostIncluded } from '../fixed-costs/fixedCostPeriod';
+
 const STORAGE_KEYS = {
   DEBTS: 'finsmart_debts_v1',
   BUDGET_PROFILE: 'finsmart_budget_profile_v1'
@@ -74,8 +77,9 @@ export const buildPrefillProfile = ({
   savingsGoals = [],
   transactions = []
 } = {}) => {
+  const currentMonth = getCurrentMonthPrefix();
   const fixedExpenses = fixedCosts
-    .filter((fc) => fc.category !== DEBT_FIXED_COST_CATEGORY)
+    .filter((fc) => fc.category !== DEBT_FIXED_COST_CATEGORY && isFixedCostIncluded(fc, currentMonth))
     .reduce((sum, fc) => sum + (Number(fc.amount) || 0), 0);
 
   const prefixes = transactions
