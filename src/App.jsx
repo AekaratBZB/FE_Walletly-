@@ -6,7 +6,7 @@ import { Navbar } from './components/Navbar';
 import { AddTransactionFab } from './components/AddTransactionFab';
 import { ToastContainer } from './components/Toast';
 import { MemberOnly } from './components/MemberOnly';
-import { BarChart3, Landmark } from 'lucide-react';
+import { Landmark } from 'lucide-react';
 import { AuthView } from './features/auth';
 import { CookieConsentBanner, CookiePreferencesModal, PrivacyPolicyModal } from './features/cookie';
 
@@ -62,16 +62,8 @@ export const App = () => {
           </MemberOnly>
         );
       case 'reports':
-        return (
-          <MemberOnly
-            page
-            icon={BarChart3}
-            title="รายงานใช้ได้เฉพาะสมาชิก"
-            description="ดูสรุปรายรับ รายจ่าย และฟิกคอสแยกตามหมวดหมู่ เลือกช่วงเดือนหรือปีได้อิสระ"
-          >
-            <ReportsTab />
-          </MemberOnly>
-        );
+        // กั้นเฉพาะส่วนกราฟใน ReportsTab: ส่วนสำรองข้อมูล/โหลด Demo ยังจำเป็นสำหรับโหมดทดลอง
+        return <ReportsTab />;
       default:
         return <DashboardTab />;
     }

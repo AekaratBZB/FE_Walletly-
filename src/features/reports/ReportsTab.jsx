@@ -1,7 +1,13 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { CHART_COLORS, CHART_PALETTE } from '../../shared/chartColors';
 import { useWallet } from '../../context/WalletContext';
+import { useAuth } from '../../context/AuthContext';
 import { getStoredToken } from '../../shared/api';
+import { getCurrentMonthPrefix } from '../../shared/formatters';
+import { MemberOnly } from '../../components/MemberOnly';
+import { ReportPeriodPicker } from './ReportPeriodPicker';
+import { getPresetRange } from './reportPeriod';
+import { useFinanceReport } from './useFinanceReport';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -35,30 +41,42 @@ ChartJS.register(
 
 export const ReportsTab = () => {
   const {
-    transactions,
-    fixedCosts,
     exportTransactionsCSV,
     exportBackupJSON,
     importBackupJSON,
     resetToDemo,
     clearAllData
   } = useWallet();
+  const { user } = useAuth();
+  const isGuest = !!user?.isGuest;
 
   const fileInputRef = useRef(null);
   const isLoggedIn = !!getStoredToken();
 
-  // 1. Doughnut Chart: Category Breakdown
-  const categoryTotals = {};
-  transactions.filter(t => t.type === 'expense').forEach(t => {
-    categoryTotals[t.category] = (categoryTotals[t.category] || 0) + (Number(t.amount) || 0);
-  });
-  fixedCosts.forEach(fc => {
-    const key = `ฟิกคอส: ${fc.title}`;
-    categoryTotals[key] = (categoryTotals[key] || 0) + (Number(fc.amount) || 0);
-  });
+  // ช่วงเวลา: ค่าเริ่มต้นทั้งปีปัจจุบัน ตัวเลือกด่วนคำนวณจากเดือนปัจจุบันจริงทุกครั้ง
+  const [preset, setPreset] = useState('thisYear');
+  const [customRange, setCustomRange] = useState(() => getPresetRange('thisYear', getCurrentMonthPrefix()));
+  const range = preset === 'custom' ? customRange : getPresetRange(preset, getCurrentMonthPrefix());
 
-  const doughnutLabels = Object.keys(categoryTotals);
-  const doughnutDataValues = Object.values(categoryTotals);
+  const handlePresetChange = (key) => {
+    // เปิด "กำหนดเอง" ครั้งแรกเริ่มจากช่วงที่ดูอยู่
+    if (key === 'custom' && preset !== 'custom') setCustomRange(range);
+    setPreset(key);
+  };
+
+  // ตัวเลขทั้งหมดคำนวณที่ BE (ฟิกคอสนับแยกรายเดือนตามระยะเวลาและการติ๊กออก)
+  const { report, error, isLoading, reload } = useFinanceReport(range, !isGuest);
+
+  const totalIncome = report?.totalIncome || 0;
+  const totalFixedCosts = report?.totalFixedCosts || 0;
+  const totalVariable = report?.totalVariableExpense || 0;
+  const totalSavings = report?.totalSavings || 0;
+  const netCashflow = report?.netCashflow || 0;
+
+  // 1. Doughnut Chart: Category Breakdown
+  const breakdown = report?.expenseBreakdown || [];
+  const doughnutLabels = breakdown.map(i => (i.kind === 'fixed' ? `ฟิกคอส: ${i.name}` : i.name));
+  const doughnutDataValues = breakdown.map(i => Number(i.amount) || 0);
 
   const colors = CHART_PALETTE;
 
@@ -75,12 +93,6 @@ export const ReportsTab = () => {
   };
 
   // 2. Bar Chart: Cash Flow Breakdown
-  const totalFixedCosts = fixedCosts.reduce((s, c) => s + (Number(c.amount) || 0), 0);
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  const totalVariable = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  const totalSavings = transactions.filter(t => t.type === 'savings').reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  const netCashflow = totalIncome - totalFixedCosts - totalVariable - totalSavings;
-
   const barChartData = {
     labels: ['รายรับรวม', 'ฟิกคอสคงที่', 'รายจ่ายผันแปร', 'ออม & ลงทุน', 'เงินเหลือสุทธิ'],
     datasets: [
@@ -138,6 +150,30 @@ export const ReportsTab = () => {
           <p>วิเคราะห์ภาพรวมการเงินผ่านชาร์ตสถิติ และสำรองหรือกู้คืนข้อมูลในระบบ</p>
         </div>
       </div>
+
+      {/* รายงาน (คำนวณที่ BE) — โหมดทดลองเห็นการ์ดชวนสมัคร ส่วนสำรองข้อมูลด้านล่างยังใช้ได้ */}
+      <MemberOnly
+        icon={BarChart2}
+        title="รายงานใช้ได้เฉพาะสมาชิก"
+        description="ดูสรุปรายรับ รายจ่าย และฟิกคอสแยกตามหมวดหมู่ เลือกช่วงเดือนหรือปีได้อิสระ"
+      >
+      <ReportPeriodPicker
+        preset={preset}
+        range={range}
+        onPresetChange={handlePresetChange}
+        onRangeChange={setCustomRange}
+      />
+
+      {error && (
+        <div className="flex items-center justify-between gap-2 mb-4 text-sm text-danger">
+          <span>โหลดรายงานจากเซิร์ฟเวอร์ไม่สำเร็จ</span>
+          <button className="btn btn-outline btn-sm" onClick={reload}>
+            <RotateCcw size={14} />
+            <span>ลองอีกครั้ง</span>
+          </button>
+        </div>
+      )}
+      {isLoading && !report && <div className="text-sm text-muted mb-4">กำลังโหลดรายงาน…</div>}
 
       {/* Visual Charts Grid */}
       <div className="grid grid-cols-3 gap-6 mb-6">
@@ -246,6 +282,8 @@ export const ReportsTab = () => {
           />
         </div>
       </div>
+
+      </MemberOnly>
 
       {/* Data Management & Backup Card */}
       <div className="card">
