@@ -1,11 +1,18 @@
 import { useState, useEffect } from 'react';
 import { loadFixedCosts, saveFixedCosts } from './fixedCostsStorage';
 import { fixedCostsApi, getStoredToken } from '../../shared/api';
+import { getCurrentMonthPrefix } from '../../shared/formatters';
+import { toApiMonth, toMonthKey } from './fixedCostPeriod';
+
+// id ที่ BE สร้าง (GUID) ไม่ใช่ id ชั่วคราวฝั่ง FE ('fc-...')
+const isSyncedId = (id) => typeof id === 'string' && id.includes('-') && !id.startsWith('fc-');
 
 export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) => {
   const token = getStoredToken();
   const [fixedCosts, setFixedCosts] = useState(() => (token ? [] : loadFixedCosts()));
   const [isAddFixedCostOpen, setIsAddFixedCostOpen] = useState(false);
+  // รายการที่กำลังแก้ไขใน AddFixedCostModal (null = เพิ่มใหม่)
+  const [editingFixedCost, setEditingFixedCost] = useState(null);
   const [isLoadingFixedCosts, setIsLoadingFixedCosts] = useState(false);
 
   // Sync to local storage
@@ -37,7 +44,12 @@ export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) =
             isPaid: !!dto.isPaid,
             category: dto.categoryName || 'ค่าใช้จ่ายคงที่',
             categoryId: dto.categoryId,
-            autoDeduct: !!dto.autoDeduct
+            autoDeduct: !!dto.autoDeduct,
+            note: dto.note || '',
+            linkedDebtId: dto.linkedDebtId || null,
+            startMonth: toMonthKey(dto.startMonth),
+            endMonth: toMonthKey(dto.endMonth),
+            excludedMonths: (dto.excludedMonths || []).map(toMonthKey)
           }));
           setFixedCosts(mapped);
         }
@@ -60,7 +72,10 @@ export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) =
       id: cost.id || `fc-${Date.now()}`,
       amount: Number(cost.amount) || 0,
       dueDay: Number(cost.dueDay) || 1,
-      isPaid: cost.isPaid || false
+      isPaid: cost.isPaid || false,
+      startMonth: cost.startMonth || null,
+      endMonth: cost.endMonth || null,
+      excludedMonths: []
     };
 
     setFixedCosts(prev => [...prev, newCost]);
@@ -82,13 +97,19 @@ export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) =
             amount: newCost.amount,
             dueDay: newCost.dueDay,
             categoryId,
-            autoDeduct: false,
-            note: ''
+            autoDeduct: !!newCost.autoDeduct,
+            note: newCost.note || '',
+            startMonth: toApiMonth(newCost.startMonth),
+            endMonth: toApiMonth(newCost.endMonth)
           });
 
           if (created?.id) {
             setFixedCosts(prev =>
-              prev.map(fc => (fc.id === newCost.id ? { ...fc, id: created.id } : fc))
+              prev.map(fc =>
+                fc.id === newCost.id
+                  ? { ...fc, id: created.id, categoryId: created.categoryId, category: created.categoryName || fc.category }
+                  : fc
+              )
             );
           }
         }
@@ -103,6 +124,50 @@ export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) =
         'success'
       );
     }
+  };
+
+  const updateFixedCost = async (id, changes) => {
+    const current = fixedCosts.find(fc => fc.id === id);
+    if (!current) return;
+
+    const updated = {
+      ...current,
+      ...changes,
+      amount: Number(changes.amount ?? current.amount) || 0,
+      dueDay: Number(changes.dueDay ?? current.dueDay) || 1,
+      startMonth: changes.startMonth ?? current.startMonth ?? null,
+      endMonth: 'endMonth' in changes ? changes.endMonth : current.endMonth ?? null
+    };
+
+    setFixedCosts(prev => prev.map(fc => (fc.id === id ? updated : fc)));
+
+    if (getStoredToken() && isSyncedId(id)) {
+      try {
+        const saved = await fixedCostsApi.update(id, {
+          categoryId: updated.categoryId,
+          title: updated.title,
+          amount: updated.amount,
+          dueDay: updated.dueDay,
+          autoDeduct: !!updated.autoDeduct,
+          isActive: true,
+          linkedDebtId: updated.linkedDebtId || null,
+          note: updated.note || '',
+          startMonth: toApiMonth(updated.startMonth),
+          endMonth: toApiMonth(updated.endMonth)
+        });
+        if (saved?.categoryName) {
+          setFixedCosts(prev => prev.map(fc => (fc.id === id ? { ...fc, category: saved.categoryName } : fc)));
+        }
+      } catch (err) {
+        console.warn('Failed to sync fixed cost update to BE:', err);
+        // คืนค่าเดิม ไม่ให้หน้าจอแสดงข้อมูลที่ BE ไม่ได้บันทึก
+        setFixedCosts(prev => prev.map(fc => (fc.id === id ? current : fc)));
+        if (addToast) addToast(`แก้ไข "${current.title}" ไม่สำเร็จ`, 'danger');
+        return;
+      }
+    }
+
+    if (addToast) addToast(`แก้ไขฟิกคอส "${updated.title}" เรียบร้อยแล้ว`, 'success');
   };
 
   const toggleFixedCostPaid = async (id) => {
@@ -140,6 +205,34 @@ export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) =
           : `ยกเลิกสถานะชำระ "${targetTitle}"`,
         'info'
       );
+    }
+  };
+
+  // ติ๊กเลือก/เอาออกจากรายจ่ายของเดือน (ทีละรายการหรือเลือกทั้งหมด) ค่าเริ่มต้นนับทุกเดือน
+  const setFixedCostsIncluded = async (ids, included, monthKey = getCurrentMonthPrefix()) => {
+    const idSet = new Set(ids);
+    if (idSet.size === 0) return;
+
+    setFixedCosts(prev =>
+      prev.map(fc => {
+        if (!idSet.has(fc.id)) return fc;
+        const others = (fc.excludedMonths || []).filter(m => m !== monthKey);
+        return { ...fc, excludedMonths: included ? others : [...others, monthKey] };
+      })
+    );
+
+    const syncedIds = ids.filter(isSyncedId);
+    if (getStoredToken() && syncedIds.length > 0) {
+      try {
+        await fixedCostsApi.setInclusion({
+          periodMonth: toApiMonth(monthKey),
+          fixedCostIds: syncedIds,
+          included
+        });
+      } catch (err) {
+        console.warn('Failed to sync fixed cost inclusion to BE:', err);
+        if (addToast) addToast('บันทึกการเลือกฟิกคอสไปยังเซิร์ฟเวอร์ไม่สำเร็จ', 'danger');
+      }
     }
   };
 
@@ -182,9 +275,13 @@ export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) =
     setFixedCosts,
     isAddFixedCostOpen,
     setIsAddFixedCostOpen,
+    editingFixedCost,
+    setEditingFixedCost,
     isLoadingFixedCosts,
     addFixedCost,
+    updateFixedCost,
     toggleFixedCostPaid,
+    setFixedCostsIncluded,
     deleteFixedCost,
     resetFixedCostsMonthly
   };

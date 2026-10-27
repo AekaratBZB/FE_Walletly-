@@ -47,6 +47,14 @@ export const fixedCostsApi = {
     });
   },
 
+  // data: { periodMonth: 'YYYY-MM-01', fixedCostIds: [], included: boolean }
+  async setInclusion(data) {
+    return apiClient('/fixed-costs/inclusion', {
+      method: 'PUT',
+      body: data
+    });
+  },
+
   async resetMonthly() {
     return apiClient('/fixed-costs/reset-monthly', {
       method: 'POST'

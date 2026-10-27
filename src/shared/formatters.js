@@ -68,3 +68,12 @@ export const formatMonthLabel = (m) => {
   if (!m || !m.year || !m.month) return '-';
   return `${THAI_MONTHS_SHORT[m.month - 1]} ${m.year + 543}`;
 };
+
+/**
+ * Formats a 'YYYY-MM' month key the same way, e.g. "2026-10" -> "ต.ค. 2569"
+ */
+export const formatMonthKey = (monthKey) => {
+  if (!monthKey) return '-';
+  const [year, month] = String(monthKey).split('-').map(Number);
+  return formatMonthLabel({ year, month });
+};
