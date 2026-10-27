@@ -18,11 +18,12 @@ export const AuthView = () => {
     isAuthLoading,
     backendStatus,
     emailVerification,
-    clearEmailVerification
+    clearEmailVerification,
+    authViewMode
   } = useAuth();
   const { addToast } = useWallet();
 
-  const [mode, setMode] = useState('login'); // 'login' | 'register'
+  const [mode, setMode] = useState(authViewMode || 'login'); // 'login' | 'register'
   const [notice, setNotice] = useState(null); // { type, message } | null
   const [prefillEmail, setPrefillEmail] = useState(savedEmail || '');
 

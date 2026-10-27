@@ -5,6 +5,8 @@ import { useCookieConsent } from './context/CookieContext';
 import { Navbar } from './components/Navbar';
 import { AddTransactionFab } from './components/AddTransactionFab';
 import { ToastContainer } from './components/Toast';
+import { MemberOnly } from './components/MemberOnly';
+import { BarChart3, Landmark } from 'lucide-react';
 import { AuthView } from './features/auth';
 import { CookieConsentBanner, CookiePreferencesModal, PrivacyPolicyModal } from './features/cookie';
 
@@ -49,9 +51,27 @@ export const App = () => {
       case 'savings':
         return <SavingsTab />;
       case 'tax':
-        return <TaxTab />;
+        return (
+          <MemberOnly
+            page
+            icon={Landmark}
+            title="วางแผนภาษีใช้ได้เฉพาะสมาชิก"
+            description="คำนวณภาษี ภ.ง.ด. 90/91 ตามขั้นภาษีและค่าลดหย่อนล่าสุดจากเซิร์ฟเวอร์ และบันทึกข้อมูลไว้ใช้ได้ทุกเครื่อง"
+          >
+            <TaxTab />
+          </MemberOnly>
+        );
       case 'reports':
-        return <ReportsTab />;
+        return (
+          <MemberOnly
+            page
+            icon={BarChart3}
+            title="รายงานใช้ได้เฉพาะสมาชิก"
+            description="ดูสรุปรายรับ รายจ่าย และฟิกคอสแยกตามหมวดหมู่ เลือกช่วงเดือนหรือปีได้อิสระ"
+          >
+            <ReportsTab />
+          </MemberOnly>
+        );
       default:
         return <DashboardTab />;
     }
