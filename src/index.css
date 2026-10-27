@@ -925,6 +925,79 @@ a:hover {
   box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
+/* Thai B.E. date / month picker (components/ThaiDatePicker.jsx) */
+.thai-picker-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+.thai-picker-trigger:disabled { cursor: not-allowed; opacity: 0.6; }
+.thai-picker-placeholder { color: var(--text-subtle); }
+.thai-picker-panel {
+  position: fixed;
+  z-index: 1500; /* เหนือ modal-backdrop (1000) ใต้ toast (2000) */
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 0.75rem;
+}
+.thai-picker-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.thai-picker-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-main);
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+.thai-picker-title.is-link { cursor: pointer; }
+.thai-picker-title.is-link:hover { background: var(--bg-subtle); }
+.thai-picker-grid { display: grid; gap: 4px; }
+.thai-picker-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.thai-picker-grid.cols-7 { grid-template-columns: repeat(7, 1fr); }
+.thai-picker-weekday {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+.thai-picker-cell {
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 8px 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-main);
+  cursor: pointer;
+}
+.thai-picker-cell:hover:not(:disabled) { background: var(--bg-subtle); }
+.thai-picker-cell:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+.thai-picker-cell.is-current { border-color: var(--primary); }
+.thai-picker-cell.is-selected {
+  background: var(--primary);
+  color: var(--text-on-primary);
+  font-weight: 600;
+}
+.thai-picker-cell:disabled { color: var(--text-subtle); opacity: 0.45; cursor: not-allowed; }
+.thai-picker-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-light);
+}
+
 /* Modals */
 .modal-backdrop {
   position: fixed;

@@ -1,3 +1,5 @@
+import { THAI_MONTHS_SHORT } from './thaiCalendar';
+
 /**
  * Formats a number to Thai Baht currency string
  * e.g., 50000 -> "50,000 ฿"
@@ -19,14 +21,15 @@ export const formatCurrency = (amount, includeSymbol = true, decimals = 0) => {
 };
 
 /**
- * Formats a date string (YYYY-MM-DD) into readable format
+ * Formats a date string (YYYY-MM-DD) as DD/MM/YYYY with a Buddhist-era year,
+ * e.g. "2026-10-27" -> "27/10/2569"
  */
 export const formatDate = (dateStr) => {
   if (!dateStr) return '-';
   try {
     const parts = dateStr.split('-');
     if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      return `${parts[2]}/${parts[1]}/${Number(parts[0]) + 543}`;
     }
     return dateStr;
   } catch (e) {
@@ -55,10 +58,6 @@ export const getCurrentMonthPrefix = () => {
   return `${year}-${month}`;
 };
 
-const THAI_MONTHS_SHORT = [
-  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
-  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
-];
 
 /**
  * Formats a { year, month } pair (month 1-12) as a Thai short month with a

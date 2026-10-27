@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { Modal } from '../../components/Modal';
+import { ThaiDatePicker } from '../../components/ThaiDatePicker';
 import { TRANSACTION_CATEGORIES, PAYMENT_METHODS } from '../../shared/constants';
 import { getTodayDateString } from '../../shared/formatters';
 
@@ -121,13 +122,7 @@ export const AddTransactionModal = () => {
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">วันที่ทำรายการ</label>
-            <input
-              type="date"
-              className="form-input"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
+            <ThaiDatePicker value={date} onChange={setDate} ariaLabel="วันที่ทำรายการ" />
           </div>
         </div>
 

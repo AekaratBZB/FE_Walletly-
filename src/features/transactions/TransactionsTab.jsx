@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { formatCurrency, formatDate, formatMonthKey, getCurrentMonthPrefix } from '../../shared/formatters';
 import { addMonths } from '../fixed-costs/fixedCostPeriod';
+import { ThaiDatePicker, ThaiMonthPicker } from '../../components/ThaiDatePicker';
 import { Search, Plus, Trash2, Download, ReceiptText, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // 'month' = รายเดือน (ค่าเริ่มต้น: เดือนปัจจุบัน), 'range' = ช่วงวันที่, 'all' = ทั้งหมด
@@ -162,13 +163,11 @@ export const TransactionsTab = () => {
               >
                 <ChevronLeft size={14} />
               </button>
-              <input
-                type="month"
-                className="form-input num-font"
-                style={{ width: '170px' }}
+              <ThaiMonthPicker
+                style={{ width: '180px' }}
                 value={month}
-                onChange={(e) => setMonth(e.target.value || currentMonth)}
-                aria-label="เลือกเดือน"
+                onChange={(v) => setMonth(v || currentMonth)}
+                ariaLabel="เลือกเดือน"
               />
               <button
                 className="btn btn-outline btn-sm"
@@ -189,24 +188,24 @@ export const TransactionsTab = () => {
 
           {periodMode === 'range' && (
             <>
-              <input
-                type="date"
-                className="form-input num-font"
+              <ThaiDatePicker
                 style={{ width: '170px' }}
                 value={startDate}
                 max={endDate || undefined}
-                onChange={(e) => setStartDate(e.target.value)}
-                aria-label="ตั้งแต่วันที่"
+                onChange={setStartDate}
+                placeholder="ตั้งแต่วันที่"
+                ariaLabel="ตั้งแต่วันที่"
+                allowClear
               />
               <span className="text-muted text-sm">ถึง</span>
-              <input
-                type="date"
-                className="form-input num-font"
+              <ThaiDatePicker
                 style={{ width: '170px' }}
                 value={endDate}
                 min={startDate || undefined}
-                onChange={(e) => setEndDate(e.target.value)}
-                aria-label="ถึงวันที่"
+                onChange={setEndDate}
+                placeholder="ถึงวันที่"
+                ariaLabel="ถึงวันที่"
+                allowClear
               />
             </>
           )}

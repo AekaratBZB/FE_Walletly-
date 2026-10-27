@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { Modal } from '../../components/Modal';
+import { ThaiMonthPicker } from '../../components/ThaiDatePicker';
 import { FIXED_COST_CATEGORIES } from '../../shared/constants';
 import { formatMonthKey, getCurrentMonthPrefix } from '../../shared/formatters';
 import { addMonths, getDurationMonths } from './fixedCostPeriod';
@@ -152,12 +153,12 @@ export const AddFixedCostModal = () => {
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">เริ่มนับตั้งแต่เดือน</label>
-            <input
-              type="month"
-              className="form-input num-font"
+            <ThaiMonthPicker
               value={startMonth}
-              onChange={(e) => setStartMonth(e.target.value)}
-              required={!editingFixedCost || hasDuration}
+              onChange={setStartMonth}
+              ariaLabel="เริ่มนับตั้งแต่เดือน"
+              placeholder="ไม่ระบุ"
+              allowClear={!!editingFixedCost}
             />
           </div>
 
