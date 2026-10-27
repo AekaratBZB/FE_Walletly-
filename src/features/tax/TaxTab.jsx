@@ -1,6 +1,7 @@
 import React from 'react';
 import { useWallet } from '../../context/WalletContext';
-import { calculateThaiTax, PERSONAL_ALLOWANCE } from './taxCalculator';
+import { useTaxCalculation } from './useTaxCalculation';
+import { EMPTY_TAX_RESULT } from './taxResult';
 import { formatCurrency } from '../../shared/formatters';
 import { RotateCcw, Receipt } from 'lucide-react';
 import './tax.css';
@@ -8,7 +9,9 @@ import './tax.css';
 export const TaxTab = () => {
   const { taxSettings, updateTaxSettings, resetTaxSettings } = useWallet();
 
-  const res = calculateThaiTax(taxSettings);
+  // คำนวณที่ BE (ขั้นภาษีและค่าลดหย่อนชุดเดียวของระบบ) แสดงผลล่าสุดค้างไว้ระหว่างรอคำตอบใหม่
+  const { result, error, isLoading } = useTaxCalculation(taxSettings);
+  const res = result || EMPTY_TAX_RESULT;
   const hasIncome = res.grossIncome > 0;
 
   const handleChange = (field, val) => {
@@ -97,7 +100,7 @@ export const TaxTab = () => {
             </h4>
             <div className="flex justify-between items-center text-xs mb-3 p-2" style={{ background: 'var(--primary-light)', borderRadius: 'var(--radius-md)' }}>
               <span className="text-muted">ลดหย่อนส่วนตัว (ได้อัตโนมัติทุกคน):</span>
-              <span className="font-semibold num-font text-primary">{formatCurrency(PERSONAL_ALLOWANCE)}</span>
+              <span className="font-semibold num-font text-primary">{formatCurrency(res.personalDeduction)}</span>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
@@ -262,6 +265,13 @@ export const TaxTab = () => {
                 <span>สรุปผลการคำนวณภาษี</span>
               </div>
             </div>
+
+            {error && (
+              <div className="p-2 mb-3 text-xs text-danger" style={{ background: 'var(--danger-light)', borderRadius: 'var(--radius-md)' }}>
+                คำนวณภาษีจากเซิร์ฟเวอร์ไม่สำเร็จ ตัวเลขด้านล่างอาจไม่เป็นปัจจุบัน
+              </div>
+            )}
+            {isLoading && !result && <div className="text-xs text-muted mb-2">กำลังคำนวณ…</div>}
 
             {/* Refund / Due Status Banner */}
             {!hasIncome ? (
