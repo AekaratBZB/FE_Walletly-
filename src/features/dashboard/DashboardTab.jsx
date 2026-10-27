@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { StatCard } from '../../components/StatCard';
 import { formatCurrency, formatDate, getCurrentMonthPrefix } from '../../shared/formatters';
+import {
+  describeFixedCostPeriod,
+  isFixedCostActiveInMonth,
+  isFixedCostIncluded
+} from '../fixed-costs/fixedCostPeriod';
 import {
   Wallet,
   CreditCard,
@@ -22,7 +27,7 @@ export const DashboardTab = () => {
     setActiveTab,
     setIsAddFixedCostOpen,
     setIsAddGoalOpen,
-    toggleFixedCostPaid
+    setFixedCostsIncluded
   } = useWallet();
 
   const currentMonthPrefix = getCurrentMonthPrefix();
@@ -32,8 +37,23 @@ export const DashboardTab = () => {
     .filter(t => t.type === 'income' && (t.date || '').startsWith(currentMonthPrefix))
     .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
-  const totalFixedCosts = fixedCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-  const unpaidFixedCosts = fixedCosts.filter(c => !c.isPaid).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  // ฟิกคอสที่อยู่ในระยะเวลาเดือนนี้ นับเป็นรายจ่ายอัตโนมัติ เว้นแต่ผู้ใช้ติ๊กออก
+  const monthFixedCosts = fixedCosts
+    .filter(c => isFixedCostActiveInMonth(c, currentMonthPrefix))
+    .sort((a, b) => (a.dueDay || 1) - (b.dueDay || 1));
+  const includedFixedCosts = monthFixedCosts.filter(c => isFixedCostIncluded(c, currentMonthPrefix));
+  const totalFixedCosts = includedFixedCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  const allIncluded = monthFixedCosts.length > 0 && includedFixedCosts.length === monthFixedCosts.length;
+  const someIncluded = includedFixedCosts.length > 0 && !allIncluded;
+
+  const selectAllRef = useRef(null);
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someIncluded;
+  }, [someIncluded]);
+
+  const handleSelectAll = () => {
+    setFixedCostsIncluded(monthFixedCosts.map(c => c.id), !allIncluded);
+  };
 
   const totalVariableExpenses = transactions
     .filter(t => t.type === 'expense' && (t.date || '').startsWith(currentMonthPrefix))
@@ -47,7 +67,6 @@ export const DashboardTab = () => {
   const netRemaining = totalIncome - totalSpent - totalSavings;
 
   const recentTxs = transactions.slice(0, 5);
-  const sortedFixedCosts = [...fixedCosts].sort((a, b) => (a.dueDay || 1) - (b.dueDay || 1));
 
   return (
     <div className="tab-panel active">
@@ -111,7 +130,11 @@ export const DashboardTab = () => {
         <StatCard
           label="ฟิกคอสประจำเดือน"
           value={formatCurrency(totalFixedCosts)}
-          subtext={fixedCosts.length === 0 ? 'ยังไม่มีฟิกคอส' : unpaidFixedCosts > 0 ? `รอจ่าย ${formatCurrency(unpaidFixedCosts)}` : '✓ จ่ายครบแล้ว'}
+          subtext={
+            monthFixedCosts.length === 0
+              ? 'ยังไม่มีฟิกคอสเดือนนี้'
+              : `นับในรายจ่าย ${includedFixedCosts.length}/${monthFixedCosts.length} รายการ`
+          }
           icon={CalendarClock}
           colorScheme="orange"
           valueClass="text-warning"
@@ -205,7 +228,7 @@ export const DashboardTab = () => {
                 <CheckSquare size={18} color="var(--primary)" />
                 <span>Checklist ฟิกคอส</span>
               </div>
-              <div className="card-subtitle">รายการที่ต้องจ่ายในเดือนนี้</div>
+              <div className="card-subtitle">ติ๊ก = นับเป็นรายจ่ายของเดือนนี้</div>
             </div>
             <button
               className="btn btn-outline btn-sm"
@@ -216,56 +239,89 @@ export const DashboardTab = () => {
             </button>
           </div>
 
-          <div>
-            {sortedFixedCosts.length === 0 ? (
-              <div className="text-muted text-center p-4">ไม่มีรายการฟิกคอสในระบบ</div>
-            ) : (
-              sortedFixedCosts.slice(0, 5).map(fc => (
-                <div
-                  key={fc.id}
-                  className="flex items-center justify-between"
-                  style={{
-                    padding: '0.65rem 0',
-                    borderBottom: '1px solid var(--border-light)'
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={fc.isPaid}
-                      onChange={() => toggleFixedCostPaid(fc.id)}
+          {monthFixedCosts.length === 0 ? (
+            <div className="text-muted text-center p-4">ไม่มีรายการฟิกคอสในเดือนนี้</div>
+          ) : (
+            <>
+              <label
+                className="flex items-center justify-between"
+                style={{
+                  padding: '0.5rem 0',
+                  borderBottom: '1px solid var(--border-light)',
+                  cursor: 'pointer'
+                }}
+              >
+                <span className="flex items-center gap-2">
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allIncluded}
+                    onChange={handleSelectAll}
+                    aria-label="เลือกฟิกคอสทั้งหมด"
+                    style={{ accentColor: 'var(--primary)', cursor: 'pointer', width: 16, height: 16 }}
+                  />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                    เลือกทั้งหมด ({includedFixedCosts.length}/{monthFixedCosts.length})
+                  </span>
+                </span>
+                <span className="num-font font-bold text-sm text-warning">
+                  {formatCurrency(totalFixedCosts)}
+                </span>
+              </label>
+
+              <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                {monthFixedCosts.map(fc => {
+                  const included = isFixedCostIncluded(fc, currentMonthPrefix);
+                  return (
+                    <label
+                      key={fc.id}
+                      className="flex items-center justify-between"
                       style={{
-                        accentColor: 'var(--primary)',
-                        cursor: 'pointer',
-                        width: 16,
-                        height: 16
+                        padding: '0.65rem 0',
+                        borderBottom: '1px solid var(--border-light)',
+                        cursor: 'pointer'
                       }}
-                    />
-                    <div>
-                      <div
-                        style={{
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          textDecoration: fc.isPaid ? 'line-through' : 'none',
-                          opacity: fc.isPaid ? 0.6 : 1
-                        }}
+                    >
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={included}
+                          onChange={() => setFixedCostsIncluded([fc.id], !included)}
+                          style={{
+                            accentColor: 'var(--primary)',
+                            cursor: 'pointer',
+                            width: 16,
+                            height: 16
+                          }}
+                        />
+                        <span>
+                          <span
+                            style={{
+                              display: 'block',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              opacity: included ? 1 : 0.5
+                            }}
+                          >
+                            {fc.title}
+                          </span>
+                          <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            วันที่ {fc.dueDay} · {describeFixedCostPeriod(fc, currentMonthPrefix)}
+                          </span>
+                        </span>
+                      </span>
+                      <span
+                        className={`num-font font-bold text-sm ${included ? 'text-main' : 'text-muted'}`}
+                        style={{ textDecoration: included ? 'none' : 'line-through' }}
                       >
-                        {fc.title}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        กำหนดชำระวันที่ {fc.dueDay}
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className={`num-font font-bold text-sm ${fc.isPaid ? 'text-muted' : 'text-main'}`}
-                  >
-                    {formatCurrency(fc.amount)}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+                        {formatCurrency(fc.amount)}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

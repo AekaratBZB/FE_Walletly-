@@ -1,7 +1,16 @@
 import React, { useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
-import { formatCurrency, formatDate } from '../../shared/formatters';
-import { Search, Plus, Trash2, Download, ReceiptText, X } from 'lucide-react';
+import { formatCurrency, formatDate, formatMonthKey, getCurrentMonthPrefix } from '../../shared/formatters';
+import { addMonths } from '../fixed-costs/fixedCostPeriod';
+import { Search, Plus, Trash2, Download, ReceiptText, X, ChevronLeft, ChevronRight } from 'lucide-react';
+
+// 'month' = รายเดือน (ค่าเริ่มต้น: เดือนปัจจุบัน), 'range' = ช่วงวันที่, 'all' = ทั้งหมด
+const matchPeriod = (date, { periodMode, month, startDate, endDate }) => {
+  const d = date || '';
+  if (periodMode === 'month') return d.startsWith(month);
+  if (periodMode === 'range') return (!startDate || d >= startDate) && (!endDate || d <= endDate);
+  return true;
+};
 
 export const TransactionsTab = () => {
   const {
@@ -11,10 +20,33 @@ export const TransactionsTab = () => {
     exportTransactionsCSV
   } = useWallet();
 
+  const currentMonth = getCurrentMonthPrefix();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [periodMode, setPeriodMode] = useState('month');
+  const [month, setMonth] = useState(currentMonth);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  const period = { periodMode, month, startDate, endDate };
+  const periodLabel =
+    periodMode === 'month'
+      ? `เดือน ${formatMonthKey(month)}`
+      : periodMode === 'range'
+        ? `${startDate ? formatDate(startDate) : 'เริ่มต้น'} – ${endDate ? formatDate(endDate) : 'ปัจจุบัน'}`
+        : 'ทุกช่วงเวลา';
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFilterType('all');
+    setPeriodMode('month');
+    setMonth(currentMonth);
+    setStartDate('');
+    setEndDate('');
+  };
 
   const filteredTransactions = transactions.filter(t => {
+    if (!matchPeriod(t.date, period)) return false;
     const matchType = filterType === 'all' || t.type === filterType;
     const term = searchTerm.toLowerCase().trim();
     const matchSearch =
@@ -98,8 +130,86 @@ export const TransactionsTab = () => {
           </div>
 
           <div className="text-xs text-muted">
-            พบทั้งหมด <b className="num-font text-main">{filteredTransactions.length}</b> รายการ
+            {periodLabel} · พบ <b className="num-font text-main">{filteredTransactions.length}</b> รายการ
           </div>
+        </div>
+
+        {/* Period filter: current month by default, browse back by month or date range */}
+        <div
+          className="flex gap-2 flex-wrap items-center"
+          style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-light)' }}
+        >
+          <div style={{ width: '160px' }}>
+            <select
+              className="form-select"
+              value={periodMode}
+              onChange={(e) => setPeriodMode(e.target.value)}
+              aria-label="ช่วงเวลา"
+            >
+              <option value="month">📅 รายเดือน</option>
+              <option value="range">🗓️ ช่วงวันที่</option>
+              <option value="all">♾️ ทั้งหมด</option>
+            </select>
+          </div>
+
+          {periodMode === 'month' && (
+            <>
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => setMonth(addMonths(month, -1))}
+                title="เดือนก่อนหน้า"
+                aria-label="เดือนก่อนหน้า"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <input
+                type="month"
+                className="form-input num-font"
+                style={{ width: '170px' }}
+                value={month}
+                onChange={(e) => setMonth(e.target.value || currentMonth)}
+                aria-label="เลือกเดือน"
+              />
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => setMonth(addMonths(month, 1))}
+                disabled={month >= currentMonth}
+                title="เดือนถัดไป"
+                aria-label="เดือนถัดไป"
+              >
+                <ChevronRight size={14} />
+              </button>
+              {month !== currentMonth && (
+                <button className="btn btn-ghost btn-sm" onClick={() => setMonth(currentMonth)}>
+                  เดือนปัจจุบัน
+                </button>
+              )}
+            </>
+          )}
+
+          {periodMode === 'range' && (
+            <>
+              <input
+                type="date"
+                className="form-input num-font"
+                style={{ width: '170px' }}
+                value={startDate}
+                max={endDate || undefined}
+                onChange={(e) => setStartDate(e.target.value)}
+                aria-label="ตั้งแต่วันที่"
+              />
+              <span className="text-muted text-sm">ถึง</span>
+              <input
+                type="date"
+                className="form-input num-font"
+                style={{ width: '170px' }}
+                value={endDate}
+                min={startDate || undefined}
+                onChange={(e) => setEndDate(e.target.value)}
+                aria-label="ถึงวันที่"
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -141,16 +251,13 @@ export const TransactionsTab = () => {
                         <div className="tx-empty-icon">
                           <Search size={22} />
                         </div>
-                        <div className="text-main" style={{ fontWeight: 600 }}>ไม่พบรายการที่ตรงกับการค้นหา</div>
+                        <div className="text-main" style={{ fontWeight: 600 }}>ไม่พบรายการใน{periodLabel}</div>
                         <div style={{ fontSize: '0.85rem', margin: '4px 0 1rem' }}>
-                          ลองเปลี่ยนคำค้นหาหรือประเภทรายการ
+                          ลองเปลี่ยนช่วงเวลา คำค้นหา หรือประเภทรายการ
                         </div>
                         <button
                           className="btn btn-outline btn-sm"
-                          onClick={() => {
-                            setSearchTerm('');
-                            setFilterType('all');
-                          }}
+                          onClick={resetFilters}
                         >
                           <X size={14} />
                           <span>ล้างตัวกรอง</span>

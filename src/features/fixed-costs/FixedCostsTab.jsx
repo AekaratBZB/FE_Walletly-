@@ -1,31 +1,63 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { StatCard } from '../../components/StatCard';
-import { formatCurrency } from '../../shared/formatters';
+import { formatCurrency, getCurrentMonthPrefix } from '../../shared/formatters';
+import { describeFixedCostPeriod, isFixedCostActiveInMonth } from './fixedCostPeriod';
 import {
   CalendarDays,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
   Clock,
+  Pencil,
   Percent,
   Plus,
   RotateCcw,
-  Trash2
+  Search,
+  Trash2,
+  X
 } from 'lucide-react';
+
+const PAGE_SIZE = 20;
+
+// 'all' = ทุกรายการ, 'month' = มีผลในเดือนที่เลือก, 'upcoming' = ยังไม่เริ่ม, 'ended' = สิ้นสุดแล้ว (เทียบเดือนนี้)
+const matchPeriod = (fc, periodMode, month, currentMonth) => {
+  if (periodMode === 'month') return isFixedCostActiveInMonth(fc, month);
+  if (periodMode === 'upcoming') return !!fc.startMonth && fc.startMonth > currentMonth;
+  if (periodMode === 'ended') return !!fc.endMonth && fc.endMonth < currentMonth;
+  return true;
+};
 
 export const FixedCostsTab = () => {
   const {
     fixedCosts,
     allocationSettings,
     setIsAddFixedCostOpen,
+    setEditingFixedCost,
     toggleFixedCostPaid,
     deleteFixedCost,
     resetFixedCostsMonthly
   } = useWallet();
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [periodMode, setPeriodMode] = useState('all');
+  const [periodMonth, setPeriodMonth] = useState(getCurrentMonthPrefix);
+  const [page, setPage] = useState(1);
+
+  // เปลี่ยนตัวกรองแล้วกลับไปหน้าแรกเสมอ
+  const updateFilter = (setter) => (value) => {
+    setter(value);
+    setPage(1);
+  };
+
   const monthlyIncome = Number(allocationSettings.monthlyIncome) || 0;
 
-  const totalAmount = fixedCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-  const paidAmount = fixedCosts.filter(c => c.isPaid).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  const currentMonth = getCurrentMonthPrefix();
+  // ยอดรวมนับเฉพาะรายการที่อยู่ในระยะเวลาของเดือนนี้ (รายการที่ยังไม่เริ่ม/สิ้นสุดแล้วยังแสดงในตาราง)
+  const activeCosts = fixedCosts.filter(c => isFixedCostActiveInMonth(c, currentMonth));
+  const totalAmount = activeCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  const paidAmount = activeCosts.filter(c => c.isPaid).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
   const unpaidAmount = totalAmount - paidAmount;
   const burdenRatio = monthlyIncome > 0 ? (totalAmount / monthlyIncome) * 100 : 0;
 
@@ -42,7 +74,35 @@ export const FixedCostsTab = () => {
     ratioDesc = 'เริ่มตึงตัว (40% - 50% ของรายได้)';
   }
 
-  const sortedCosts = [...fixedCosts].sort((a, b) => (a.dueDay || 1) - (b.dueDay || 1));
+  const categoryOptions = [...new Set(fixedCosts.map(c => c.category).filter(Boolean))].sort();
+  const term = searchTerm.toLowerCase().trim();
+  const filteredCosts = fixedCosts
+    .filter(c =>
+      matchPeriod(c, periodMode, periodMonth, currentMonth) &&
+      (filterCategory === 'all' || c.category === filterCategory) &&
+      (!term || (c.title || '').toLowerCase().includes(term) || (c.note || '').toLowerCase().includes(term))
+    )
+    .sort((a, b) => (a.dueDay || 1) - (b.dueDay || 1));
+
+  const totalPages = Math.max(1, Math.ceil(filteredCosts.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageCosts = filteredCosts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const isFiltered = !!term || filterCategory !== 'all' || periodMode !== 'all';
+  // ข้อความระยะเวลาอ้างอิงเดือนที่กรอง เพื่อให้เห็นว่าเดือนนั้นเป็นงวดที่เท่าไหร่
+  const describeMonth = periodMode === 'month' ? periodMonth : currentMonth;
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFilterCategory('all');
+    setPeriodMode('all');
+    setPeriodMonth(currentMonth);
+    setPage(1);
+  };
+
+  const handleEdit = (fc) => {
+    setEditingFixedCost(fc);
+    setIsAddFixedCostOpen(true);
+  };
 
   const handleDelete = (id, title) => {
     if (window.confirm(`คุณต้องการลบรายการฟิกคอส "${title}" ใช่หรือไม่?`)) {
@@ -97,7 +157,7 @@ export const FixedCostsTab = () => {
         <StatCard
           label="ชำระแล้วรอบนี้"
           value={formatCurrency(paidAmount)}
-          subtext={`${fixedCosts.filter(c => c.isPaid).length} รายการ`}
+          subtext={`${activeCosts.filter(c => c.isPaid).length} รายการ`}
           icon={CheckCircle}
           colorScheme="emerald"
           valueClass="text-success"
@@ -106,7 +166,7 @@ export const FixedCostsTab = () => {
         <StatCard
           label="ยอดที่ยังรอชำระ"
           value={formatCurrency(unpaidAmount)}
-          subtext={`${fixedCosts.filter(c => !c.isPaid).length} รายการ`}
+          subtext={`${activeCosts.filter(c => !c.isPaid).length} รายการ`}
           icon={Clock}
           colorScheme="rose"
           valueClass="text-danger"
@@ -129,6 +189,75 @@ export const FixedCostsTab = () => {
             <div className="card-title">📋 รายการภาระค่าใช้จ่ายคงที่</div>
             <div className="card-subtitle">เรียงตามวันที่ครบกำหนดชำระในแต่ละเดือน (Due Date)</div>
           </div>
+          <div className="text-xs text-muted">
+            พบ <b className="num-font text-main">{filteredCosts.length}</b> จาก {fixedCosts.length} รายการ
+          </div>
+        </div>
+
+        {/* Filters: title, category, period */}
+        <div className="flex gap-2 flex-wrap items-center mb-3">
+          <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+            <Search
+              size={16}
+              color="var(--text-muted)"
+              style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}
+            />
+            <input
+              type="text"
+              className="form-input"
+              style={{ paddingLeft: '34px' }}
+              placeholder="ค้นหาชื่อรายการ, บันทึก..."
+              value={searchTerm}
+              onChange={(e) => updateFilter(setSearchTerm)(e.target.value)}
+              aria-label="ค้นหาชื่อรายการ"
+            />
+          </div>
+
+          <div style={{ width: '220px' }}>
+            <select
+              className="form-select"
+              value={filterCategory}
+              onChange={(e) => updateFilter(setFilterCategory)(e.target.value)}
+              aria-label="หมวดหมู่"
+            >
+              <option value="all">🏷️ ทุกหมวดหมู่</option>
+              {categoryOptions.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ width: '190px' }}>
+            <select
+              className="form-select"
+              value={periodMode}
+              onChange={(e) => updateFilter(setPeriodMode)(e.target.value)}
+              aria-label="ช่วงเวลา"
+            >
+              <option value="all">♾️ ทุกช่วงเวลา</option>
+              <option value="month">📅 มีผลในเดือน...</option>
+              <option value="upcoming">⏭️ ยังไม่เริ่ม</option>
+              <option value="ended">🏁 สิ้นสุดแล้ว</option>
+            </select>
+          </div>
+
+          {periodMode === 'month' && (
+            <input
+              type="month"
+              className="form-input num-font"
+              style={{ width: '170px' }}
+              value={periodMonth}
+              onChange={(e) => updateFilter(setPeriodMonth)(e.target.value || currentMonth)}
+              aria-label="เลือกเดือน"
+            />
+          )}
+
+          {isFiltered && (
+            <button className="btn btn-ghost btn-sm" onClick={resetFilters}>
+              <X size={14} />
+              <span>ล้างตัวกรอง</span>
+            </button>
+          )}
         </div>
 
         <div className="table-container">
@@ -139,24 +268,37 @@ export const FixedCostsTab = () => {
                 <th>กำหนดชำระ</th>
                 <th>รายการ</th>
                 <th>หมวดหมู่</th>
+                <th>ระยะเวลา</th>
                 <th className="text-right">จำนวนเงิน</th>
                 <th className="text-center">สถานะบิล</th>
-                <th className="text-right" style={{ width: '80px' }}>จัดการ</th>
+                <th className="text-right" style={{ width: '100px' }}>จัดการ</th>
               </tr>
             </thead>
             <tbody>
-              {sortedCosts.length === 0 ? (
+              {pageCosts.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="text-center text-muted" style={{ padding: '3rem 1rem' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📅</div>
-                    <div style={{ fontWeight: 600 }}>ยังไม่มีรายการฟิกคอสประจำเดือน</div>
-                    <div style={{ fontSize: '0.85rem', marginTop: '4px' }}>
-                      กดปุ่ม "+ เพิ่มฟิกคอส" เพื่อบันทึกค่าใช้จ่ายคงที่ของคุณ
-                    </div>
+                  <td colSpan="8" className="text-center text-muted" style={{ padding: '3rem 1rem' }}>
+                    {fixedCosts.length === 0 ? (
+                      <>
+                        <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📅</div>
+                        <div style={{ fontWeight: 600 }}>ยังไม่มีรายการฟิกคอสประจำเดือน</div>
+                        <div style={{ fontSize: '0.85rem', marginTop: '4px' }}>
+                          กดปุ่ม "+ เพิ่มฟิกคอส" เพื่อบันทึกค่าใช้จ่ายคงที่ของคุณ
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 600 }}>ไม่พบรายการที่ตรงกับตัวกรอง</div>
+                        <button className="btn btn-outline btn-sm mt-2" onClick={resetFilters}>
+                          <X size={14} />
+                          <span>ล้างตัวกรอง</span>
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ) : (
-                sortedCosts.map(fc => (
+                pageCosts.map(fc => (
                   <tr key={fc.id} style={{ opacity: fc.isPaid ? 0.75 : 1 }}>
                     <td className="text-center">
                       <input
@@ -215,6 +357,9 @@ export const FixedCostsTab = () => {
                         {fc.category}
                       </span>
                     </td>
+                    <td className="text-sm text-muted" style={{ whiteSpace: 'nowrap' }}>
+                      {describeFixedCostPeriod(fc, describeMonth)}
+                    </td>
                     <td className="text-right num-font font-bold text-main">
                       {formatCurrency(fc.amount)}
                     </td>
@@ -225,7 +370,15 @@ export const FixedCostsTab = () => {
                         <span className="badge badge-unpaid">⏳ รอชำระ</span>
                       )}
                     </td>
-                    <td className="text-right">
+                    <td className="text-right" style={{ whiteSpace: 'nowrap' }}>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => handleEdit(fc)}
+                        title="แก้ไขรายการ"
+                        aria-label={`แก้ไข ${fc.title}`}
+                      >
+                        <Pencil size={16} />
+                      </button>
                       <button
                         className="btn btn-ghost btn-sm"
                         onClick={() => handleDelete(fc.id, fc.title)}
@@ -241,6 +394,44 @@ export const FixedCostsTab = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Paging: ไม่เกิน PAGE_SIZE รายการต่อหน้า */}
+        {filteredCosts.length > PAGE_SIZE && (
+          <div className="flex justify-between items-center flex-wrap gap-2 mt-3">
+            <div className="text-xs text-muted">
+              แสดง {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredCosts.length)} จาก{' '}
+              {filteredCosts.length} รายการ
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => setPage(currentPage - 1)}
+                disabled={currentPage <= 1}
+                aria-label="หน้าก่อนหน้า"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <button
+                  key={p}
+                  className={`btn btn-sm ${p === currentPage ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setPage(p)}
+                  aria-current={p === currentPage ? 'page' : undefined}
+                >
+                  {p}
+                </button>
+              ))}
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => setPage(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                aria-label="หน้าถัดไป"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

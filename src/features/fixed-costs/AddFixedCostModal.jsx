@@ -1,17 +1,58 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { Modal } from '../../components/Modal';
 import { FIXED_COST_CATEGORIES } from '../../shared/constants';
+import { formatMonthKey, getCurrentMonthPrefix } from '../../shared/formatters';
+import { addMonths, getDurationMonths } from './fixedCostPeriod';
 
+// ใช้ทั้งเพิ่มและแก้ไข: editingFixedCost = null คือเพิ่มใหม่
 export const AddFixedCostModal = () => {
-  const { isAddFixedCostOpen, setIsAddFixedCostOpen, addFixedCost } = useWallet();
+  const {
+    isAddFixedCostOpen,
+    setIsAddFixedCostOpen,
+    editingFixedCost,
+    setEditingFixedCost,
+    addFixedCost,
+    updateFixedCost,
+    categories = []
+  } = useWallet();
+
+  // ล็อกอินแล้วใช้หมวดหมู่ฟิกคอสจริงจาก BE เพื่อให้ได้ categoryId ที่ถูกต้อง
+  const beCategories = categories.filter(c => c.type === 'fixed');
+  const categoryOptions = beCategories.length > 0 ? beCategories.map(c => c.name) : FIXED_COST_CATEGORIES;
 
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState(FIXED_COST_CATEGORIES[0]);
+  const [category, setCategory] = useState(categoryOptions[0]);
   const [dueDay, setDueDay] = useState('1');
   const [autoDeduct, setAutoDeduct] = useState(false);
   const [note, setNote] = useState('');
+  const [startMonth, setStartMonth] = useState(getCurrentMonthPrefix);
+  // ว่าง = ไม่มีกำหนดสิ้นสุด (เช่น ค่าเน็ต), ระบุ = จำนวนงวด (เช่น ผ่อนรถ 48 เดือน)
+  const [durationMonths, setDurationMonths] = useState('');
+
+  useEffect(() => {
+    if (!isAddFixedCostOpen) return;
+    const fc = editingFixedCost;
+    setTitle(fc?.title || '');
+    setAmount(fc ? String(fc.amount) : '');
+    setCategory(fc?.category && categoryOptions.includes(fc.category) ? fc.category : categoryOptions[0]);
+    setDueDay(String(fc?.dueDay || 1));
+    setAutoDeduct(!!fc?.autoDeduct);
+    setNote(fc?.note || '');
+    // รายการเก่าที่ไม่มีเดือนเริ่ม ปล่อยว่างไว้ จะได้ไม่เปลี่ยนเดือนที่นับย้อนหลัง
+    setStartMonth(fc ? fc.startMonth || '' : getCurrentMonthPrefix());
+    setDurationMonths(fc ? String(getDurationMonths(fc) || '') : '');
+  }, [isAddFixedCostOpen, editingFixedCost]);
+
+  const numDuration = parseInt(durationMonths, 10);
+  const hasDuration = Number.isInteger(numDuration) && numDuration > 0;
+  const endMonth = hasDuration && startMonth ? addMonths(startMonth, numDuration - 1) : null;
+
+  const close = () => {
+    setIsAddFixedCostOpen(false);
+    setEditingFixedCost(null);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -23,29 +64,45 @@ export const AddFixedCostModal = () => {
       return;
     }
 
-    addFixedCost({
+    if (durationMonths !== '' && !hasDuration) {
+      alert('ระยะเวลาต้องเป็นจำนวนเดือนตั้งแต่ 1 ขึ้นไป หรือเว้นว่างถ้าไม่มีกำหนด');
+      return;
+    }
+
+    if (hasDuration && !startMonth) {
+      alert('กรุณาเลือกเดือนเริ่มต้นเมื่อระบุระยะเวลา');
+      return;
+    }
+
+    const data = {
       title: title.trim(),
       amount: numAmount,
       category,
+      categoryId: beCategories.find(c => c.name === category)?.id,
       dueDay: numDueDay >= 1 && numDueDay <= 31 ? numDueDay : 1,
       autoDeduct,
-      note: note.trim()
-    });
+      note: note.trim(),
+      startMonth: startMonth || null,
+      endMonth
+    };
 
-    // Reset & Close
-    setTitle('');
-    setAmount('');
-    setDueDay('1');
-    setAutoDeduct(false);
-    setNote('');
-    setIsAddFixedCostOpen(false);
+    if (editingFixedCost) {
+      updateFixedCost(editingFixedCost.id, {
+        ...data,
+        categoryId: data.categoryId || editingFixedCost.categoryId
+      });
+    } else {
+      addFixedCost({ ...data, startMonth: startMonth || getCurrentMonthPrefix() });
+    }
+
+    close();
   };
 
   return (
     <Modal
       isOpen={isAddFixedCostOpen}
-      onClose={() => setIsAddFixedCostOpen(false)}
-      title="🗓️ เพิ่มรายการฟิกคอสประจำเดือน"
+      onClose={close}
+      title={editingFixedCost ? '✏️ แก้ไขรายการฟิกคอส' : '🗓️ เพิ่มรายการฟิกคอสประจำเดือน'}
     >
       <form onSubmit={handleSubmit}>
         {/* Title */}
@@ -91,6 +148,38 @@ export const AddFixedCostModal = () => {
           </div>
         </div>
 
+        {/* Period: start month & duration */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">เริ่มนับตั้งแต่เดือน</label>
+            <input
+              type="month"
+              className="form-input num-font"
+              value={startMonth}
+              onChange={(e) => setStartMonth(e.target.value)}
+              required={!editingFixedCost || hasDuration}
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">ระยะเวลา (เดือน)</label>
+            <input
+              type="number"
+              className="form-input num-font"
+              min="1"
+              max="600"
+              placeholder="ว่าง = ไม่มีกำหนด"
+              value={durationMonths}
+              onChange={(e) => setDurationMonths(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="text-xs text-muted mb-3">
+          {endMonth
+            ? `นับเป็นรายจ่ายทุกเดือน ${formatMonthKey(startMonth)} – ${formatMonthKey(endMonth)} (${numDuration} เดือน)`
+            : 'นับเป็นรายจ่ายทุกเดือนโดยไม่มีกำหนดสิ้นสุด'}
+        </div>
+
         {/* Category */}
         <div className="form-group">
           <label className="form-label">หมวดหมู่ฟิกคอส</label>
@@ -99,7 +188,7 @@ export const AddFixedCostModal = () => {
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           >
-            {FIXED_COST_CATEGORIES.map(c => (
+            {categoryOptions.map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
@@ -136,12 +225,12 @@ export const AddFixedCostModal = () => {
           <button
             type="button"
             className="btn btn-outline"
-            onClick={() => setIsAddFixedCostOpen(false)}
+            onClick={close}
           >
             ยกเลิก
           </button>
           <button type="submit" className="btn btn-primary">
-            บันทึกฟิกคอส
+            {editingFixedCost ? 'บันทึกการแก้ไข' : 'บันทึกฟิกคอส'}
           </button>
         </div>
       </form>
