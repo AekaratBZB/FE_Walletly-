@@ -63,9 +63,13 @@ export const WalletProvider = ({ children }) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
+  // เพิ่มทุกครั้งที่ BE บันทึกรายการ/ฟิกคอสสำเร็จ: ยอดสรุปที่ BE คำนวณ (หน้าภาพรวม) จะโหลดใหม่หลังข้อมูลบน BE อัปเดตแล้ว
+  const [dataVersion, setDataVersion] = useState(0);
+  const onSynced = () => setDataVersion(v => v + 1);
+
   // Modular Feature Slices
-  const transactionsSlice = useTransactionsState({ addToast, categories, userId });
-  const fixedCostsSlice = useFixedCostsState({ addToast, categories, userId });
+  const transactionsSlice = useTransactionsState({ addToast, categories, userId, onSynced });
+  const fixedCostsSlice = useFixedCostsState({ addToast, categories, userId, onSynced });
   const savingsSlice = useSavingsState({
     addToast,
     addTransaction: transactionsSlice.addTransaction,
@@ -196,6 +200,7 @@ export const WalletProvider = ({ children }) => {
         resetToDemo,
         clearAllData,
         categories,
+        dataVersion,
         ...transactionsSlice,
         ...fixedCostsSlice,
         ...savingsSlice,

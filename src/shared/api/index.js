@@ -10,3 +10,4 @@ export * from './categoriesApi';
 export * from './accountsApi';
 export * from './consentsApi';
 export * from './healthApi';
+export * from './summaryApi';

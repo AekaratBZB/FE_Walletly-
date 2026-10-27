@@ -1,12 +1,15 @@
 import React, { useEffect, useRef } from 'react';
 import { useWallet } from '../../context/WalletContext';
+import { useAuth } from '../../context/AuthContext';
 import { StatCard } from '../../components/StatCard';
+import { MemberOnly } from '../../components/MemberOnly';
 import { formatCurrency, formatDate, getCurrentMonthPrefix } from '../../shared/formatters';
 import {
   describeFixedCostPeriod,
   isFixedCostActiveInMonth,
   isFixedCostIncluded
 } from '../fixed-costs/fixedCostPeriod';
+import { useMonthlySummary } from './useMonthlySummary';
 import {
   Wallet,
   CreditCard,
@@ -17,7 +20,8 @@ import {
   Sparkles,
   CheckSquare,
   BarChart3,
-  ReceiptText
+  ReceiptText,
+  RefreshCw
 } from 'lucide-react';
 
 export const DashboardTab = () => {
@@ -29,22 +33,21 @@ export const DashboardTab = () => {
     setIsAddGoalOpen,
     setFixedCostsIncluded
   } = useWallet();
+  const { user } = useAuth();
+  const isGuest = !!user?.isGuest;
 
   const currentMonthPrefix = getCurrentMonthPrefix();
+  // ตัวเลขสรุปทั้งหมดมาจาก BE (แหล่งเดียว) ฝั่ง FE ใช้รายการฟิกคอสแค่แสดงช่องติ๊ก
+  const { summary, error, isLoading, reload } = useMonthlySummary(currentMonthPrefix, !isGuest);
+  const showValue = (value) => (summary ? formatCurrency(value) : isLoading ? 'กำลังโหลด…' : '-');
 
-  // Calculations for current month
-  const totalIncome = transactions
-    .filter(t => t.type === 'income' && (t.date || '').startsWith(currentMonthPrefix))
-    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-
-  // ฟิกคอสที่อยู่ในระยะเวลาเดือนนี้ นับเป็นรายจ่ายอัตโนมัติ เว้นแต่ผู้ใช้ติ๊กออก
+  // ช่องติ๊กของรายการฟิกคอสที่อยู่ในระยะเวลาเดือนนี้ (ติ๊ก = นับเป็นรายจ่าย)
   const monthFixedCosts = fixedCosts
     .filter(c => isFixedCostActiveInMonth(c, currentMonthPrefix))
     .sort((a, b) => (a.dueDay || 1) - (b.dueDay || 1));
-  const includedFixedCosts = monthFixedCosts.filter(c => isFixedCostIncluded(c, currentMonthPrefix));
-  const totalFixedCosts = includedFixedCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-  const allIncluded = monthFixedCosts.length > 0 && includedFixedCosts.length === monthFixedCosts.length;
-  const someIncluded = includedFixedCosts.length > 0 && !allIncluded;
+  const includedCount = monthFixedCosts.filter(c => isFixedCostIncluded(c, currentMonthPrefix)).length;
+  const allIncluded = monthFixedCosts.length > 0 && includedCount === monthFixedCosts.length;
+  const someIncluded = includedCount > 0 && !allIncluded;
 
   const selectAllRef = useRef(null);
   useEffect(() => {
@@ -54,17 +57,6 @@ export const DashboardTab = () => {
   const handleSelectAll = () => {
     setFixedCostsIncluded(monthFixedCosts.map(c => c.id), !allIncluded);
   };
-
-  const totalVariableExpenses = transactions
-    .filter(t => t.type === 'expense' && (t.date || '').startsWith(currentMonthPrefix))
-    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-
-  const totalSavings = transactions
-    .filter(t => t.type === 'savings' && (t.date || '').startsWith(currentMonthPrefix))
-    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-
-  const totalSpent = totalFixedCosts + totalVariableExpenses;
-  const netRemaining = totalIncome - totalSpent - totalSavings;
 
   const recentTxs = transactions.slice(0, 5);
 
@@ -97,54 +89,72 @@ export const DashboardTab = () => {
         </div>
       </div>
 
-      {/* Top 4 Stat Cards */}
-      <div className="grid grid-cols-4 mb-6">
-        <StatCard
-          label="รายรับรวมเดือนนี้"
-          value={formatCurrency(totalIncome)}
-          subtext="เงินเดือน + รายได้เสริม"
-          icon={Wallet}
-          colorScheme="emerald"
-          valueClass="text-success"
-        />
+      {/* Top 4 Stat Cards (คำนวณที่ BE) — โหมดทดลองเห็นการ์ดชวนสมัครแทน */}
+      <div className="mb-6">
+        <MemberOnly
+          title="สมัครสมาชิกเพื่อดูสรุปการเงินรายเดือน"
+          description="รายรับ รายจ่าย ฟิกคอส และยอดคงเหลือ คำนวณจากข้อมูลบนเซิร์ฟเวอร์ ใช้ได้ทุกเครื่อง"
+        >
+          {error && (
+            <div className="flex items-center justify-between gap-2 mb-3 text-sm text-danger">
+              <span>โหลดยอดสรุปจากเซิร์ฟเวอร์ไม่สำเร็จ</span>
+              <button className="btn btn-outline btn-sm" onClick={reload}>
+                <RefreshCw size={14} />
+                <span>ลองอีกครั้ง</span>
+              </button>
+            </div>
+          )}
+          <div className="grid grid-cols-4">
+            <StatCard
+              label="รายรับรวมเดือนนี้"
+              value={showValue(summary?.totalIncome)}
+              subtext="เงินเดือน + รายได้เสริม"
+              icon={Wallet}
+              colorScheme="emerald"
+              valueClass="text-success"
+            />
 
-        <StatCard
-          label="รายจ่ายรวมทั้งหมด"
-          value={formatCurrency(totalSpent)}
-          subtext="ฟิกคอส + กินใช้ผันแปร"
-          icon={CreditCard}
-          colorScheme="rose"
-          valueClass="text-danger"
-        />
+            <StatCard
+              label="รายจ่ายรวมทั้งหมด"
+              value={showValue(summary?.totalSpent)}
+              subtext="ฟิกคอส + กินใช้ผันแปร"
+              icon={CreditCard}
+              colorScheme="rose"
+              valueClass="text-danger"
+            />
 
-        <StatCard
-          label="ยอดเงินคงเหลือสุทธิ"
-          value={formatCurrency(netRemaining)}
-          subtext="รายรับ หัก รายจ่ายและเงินออม"
-          icon={Banknote}
-          colorScheme="blue"
-          variant="dark"
-          valueClass={netRemaining >= 0 ? '' : 'text-danger'}
-        />
+            <StatCard
+              label="ยอดเงินคงเหลือสุทธิ"
+              value={showValue(summary?.netRemaining)}
+              subtext="รายรับ หัก รายจ่ายและเงินออม"
+              icon={Banknote}
+              colorScheme="blue"
+              variant="dark"
+              valueClass={(summary?.netRemaining ?? 0) >= 0 ? '' : 'text-danger'}
+            />
 
-        <StatCard
-          label="ฟิกคอสประจำเดือน"
-          value={formatCurrency(totalFixedCosts)}
-          subtext={
-            monthFixedCosts.length === 0
-              ? 'ยังไม่มีฟิกคอสเดือนนี้'
-              : `นับในรายจ่าย ${includedFixedCosts.length}/${monthFixedCosts.length} รายการ`
-          }
-          icon={CalendarClock}
-          colorScheme="orange"
-          valueClass="text-warning"
-        />
+            <StatCard
+              label="ฟิกคอสประจำเดือน"
+              value={showValue(summary?.totalFixedCosts)}
+              subtext={
+                !summary
+                  ? ' '
+                  : summary.fixedCostsActiveCount === 0
+                    ? 'ยังไม่มีฟิกคอสเดือนนี้'
+                    : `นับในรายจ่าย ${summary.fixedCostsIncludedCount}/${summary.fixedCostsActiveCount} รายการ`
+              }
+              icon={CalendarClock}
+              colorScheme="orange"
+              valueClass="text-warning"
+            />
+          </div>
+        </MemberOnly>
       </div>
 
       {/* 2-Column Grid: Recent Transactions & Fixed Cost Checklist */}
       <div className="grid grid-cols-3 gap-6">
-        {/* Left 2 Cols: Recent Transactions */}
-        <div className="card" style={{ gridColumn: 'span 2' }}>
+        {/* Left 2 Cols: Recent Transactions (โหมดทดลองกว้างเต็มแถว) */}
+        <div className="card" style={{ gridColumn: isGuest ? '1 / -1' : 'span 2' }}>
           <div className="card-header">
             <div>
               <div className="card-title">
@@ -220,7 +230,8 @@ export const DashboardTab = () => {
           </div>
         </div>
 
-        {/* Right 1 Col: Mini Fixed Costs Checklist */}
+        {/* Right 1 Col: Mini Fixed Costs Checklist (เฉพาะสมาชิก เพราะยอดที่นับคำนวณที่ BE) */}
+        {!isGuest && (
         <div className="card">
           <div className="card-header">
             <div>
@@ -261,11 +272,11 @@ export const DashboardTab = () => {
                     style={{ accentColor: 'var(--primary)', cursor: 'pointer', width: 16, height: 16 }}
                   />
                   <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
-                    เลือกทั้งหมด ({includedFixedCosts.length}/{monthFixedCosts.length})
+                    เลือกทั้งหมด ({includedCount}/{monthFixedCosts.length})
                   </span>
                 </span>
                 <span className="num-font font-bold text-sm text-warning">
-                  {formatCurrency(totalFixedCosts)}
+                  {showValue(summary?.totalFixedCosts)}
                 </span>
               </label>
 
@@ -323,6 +334,7 @@ export const DashboardTab = () => {
             </>
           )}
         </div>
+        )}
       </div>
     </div>
   );
