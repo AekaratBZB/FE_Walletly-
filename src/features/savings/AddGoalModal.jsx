@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { Modal } from '../../components/Modal';
+import { ThaiDatePicker } from '../../components/ThaiDatePicker';
 
 export const AddGoalModal = () => {
   const { isAddGoalOpen, setIsAddGoalOpen, addSavingsGoal } = useWallet();
@@ -123,11 +124,12 @@ export const AddGoalModal = () => {
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">วันที่คาดหวังจะบรรลุ</label>
-            <input
-              type="date"
-              className="form-input"
+            <ThaiDatePicker
               value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
+              onChange={setTargetDate}
+              ariaLabel="วันที่คาดหวังจะบรรลุ"
+              placeholder="ไม่ระบุ"
+              allowClear
             />
           </div>
         </div>

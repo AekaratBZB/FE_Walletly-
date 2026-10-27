@@ -5,7 +5,7 @@ import { transactionsApi, getStoredToken } from '../../shared/api';
 // กันโหลดไม่รู้จบถ้า BE ตอบ totalPages ผิดปกติ (100 หน้า x 100 รายการ)
 const MAX_TRANSACTION_PAGES = 100;
 
-export const useTransactionsState = ({ addToast, categories = [], userId } = {}) => {
+export const useTransactionsState = ({ addToast, categories = [], userId, onSynced } = {}) => {
   const token = getStoredToken();
   const [transactions, setTransactions] = useState(() => (token ? [] : loadTransactions()));
   const [isAddTxOpen, setIsAddTxOpen] = useState(false);
@@ -46,6 +46,7 @@ export const useTransactionsState = ({ addToast, categories = [], userId } = {})
     if (!getStoredToken() || !userId) return;
     try {
       setTransactions(await fetchAllApiTransactions());
+      onSynced?.();
     } catch (err) {
       console.warn('Failed to reload transactions from API:', err);
     }
@@ -118,6 +119,7 @@ export const useTransactionsState = ({ addToast, categories = [], userId } = {})
               prev.map(t => (t.id === newTx.id ? { ...t, id: created.id } : t))
             );
           }
+          onSynced?.();
         }
       } catch (err) {
         console.warn('Failed to sync new transaction to BE:', err);
@@ -139,6 +141,7 @@ export const useTransactionsState = ({ addToast, categories = [], userId } = {})
     if (token && id && typeof id === 'string' && id.includes('-') && !id.startsWith('tx-')) {
       try {
         await transactionsApi.delete(id);
+        onSynced?.();
       } catch (err) {
         console.warn('Failed to delete transaction from BE:', err);
       }

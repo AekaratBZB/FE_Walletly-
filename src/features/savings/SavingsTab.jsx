@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { StatCard } from '../../components/StatCard';
 import { formatCurrency, getCurrentMonthPrefix } from '../../shared/formatters';
+import { sumIncludedFixedCosts } from '../fixed-costs/fixedCostPeriod';
 import {
   Target,
   PiggyBank,
@@ -26,7 +27,7 @@ export const SavingsTab = () => {
   const totalTarget = savingsGoals.reduce((sum, g) => sum + (Number(g.targetAmount) || 0), 0);
 
   // Emergency Fund Calculations: fixed costs + this month's actual recorded expenses
-  const totalFixedCosts = fixedCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  const totalFixedCosts = sumIncludedFixedCosts(fixedCosts, getCurrentMonthPrefix());
   const currentMonthPrefix = getCurrentMonthPrefix();
   const thisMonthExpenses = transactions
     .filter(t => t.type === 'expense' && (t.date || '').startsWith(currentMonthPrefix))

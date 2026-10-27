@@ -3,6 +3,7 @@ import { useWallet } from '../../context/WalletContext';
 import { StatCard } from '../../components/StatCard';
 import { formatCurrency, getCurrentMonthPrefix } from '../../shared/formatters';
 import { describeFixedCostPeriod, isFixedCostActiveInMonth } from './fixedCostPeriod';
+import { ThaiMonthPicker } from '../../components/ThaiDatePicker';
 import {
   CalendarDays,
   CheckCircle,
@@ -242,13 +243,11 @@ export const FixedCostsTab = () => {
           </div>
 
           {periodMode === 'month' && (
-            <input
-              type="month"
-              className="form-input num-font"
-              style={{ width: '170px' }}
+            <ThaiMonthPicker
+              style={{ width: '180px' }}
               value={periodMonth}
-              onChange={(e) => updateFilter(setPeriodMonth)(e.target.value || currentMonth)}
-              aria-label="เลือกเดือน"
+              onChange={(v) => updateFilter(setPeriodMonth)(v || currentMonth)}
+              ariaLabel="เลือกเดือน"
             />
           )}
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { ALLOCATION_PRESETS } from '../../shared/constants';
 import { formatCurrency, getCurrentMonthPrefix } from '../../shared/formatters';
+import { sumIncludedFixedCosts } from '../fixed-costs/fixedCostPeriod';
 import { SlidersHorizontal, DollarSign } from 'lucide-react';
 
 export const AllocationTab = () => {
@@ -17,7 +18,7 @@ export const AllocationTab = () => {
   const monthlyIncome = Number(allocationSettings.monthlyIncome) || 0;
 
   const currentMonthPrefix = getCurrentMonthPrefix();
-  const totalFixedCosts = fixedCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  const totalFixedCosts = sumIncludedFixedCosts(fixedCosts, currentMonthPrefix);
   const thisMonthExpenses = transactions
     .filter(t => t.type === 'expense' && (t.date || '').startsWith(currentMonthPrefix))
     .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);

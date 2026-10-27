@@ -49,6 +49,8 @@ const verifyEmailOnce = (token) => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => restoreStoredUser(readStorage(AUTH_STORAGE_KEY), !!getStoredToken()));
   const [savedEmail, setSavedEmail] = useState(() => readStorage(REMEMBER_ME_KEY) || '');
+  // หน้า login/register ที่จะเปิด (ใช้ตอน guest กดสมัครจากการ์ดฟีเจอร์สมาชิก)
+  const [authViewMode, setAuthViewMode] = useState('login');
   const [backendStatus, setBackendStatus] = useState('checking'); // 'connected' | 'offline' | 'checking'
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
@@ -221,6 +223,14 @@ export const AuthProvider = ({ children }) => {
     persistUser(null);
   };
 
+  // ออกจากโหมดทดลองไปหน้าสมัคร/เข้าสู่ระบบ: ยังไม่ลบข้อมูลในเครื่อง
+  // ถ้ากดกลับมาใช้โหมดทดลองข้อมูลยังอยู่ ข้อมูลจะถูกล้างตอนเข้าสู่ระบบสำเร็จ (signIn)
+  const goToAuth = (mode = 'register') => {
+    setAuthViewMode(mode);
+    setUser(null);
+    persistUser(null);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -235,7 +245,9 @@ export const AuthProvider = ({ children }) => {
         register,
         loginWithSocial,
         loginAsGuest,
-        logout
+        logout,
+        authViewMode,
+        goToAuth
       }}
     >
       {children}

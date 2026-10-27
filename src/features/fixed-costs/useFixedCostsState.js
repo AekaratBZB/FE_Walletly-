@@ -7,7 +7,7 @@ import { toApiMonth, toMonthKey } from './fixedCostPeriod';
 // id ที่ BE สร้าง (GUID) ไม่ใช่ id ชั่วคราวฝั่ง FE ('fc-...')
 const isSyncedId = (id) => typeof id === 'string' && id.includes('-') && !id.startsWith('fc-');
 
-export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) => {
+export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced } = {}) => {
   const token = getStoredToken();
   const [fixedCosts, setFixedCosts] = useState(() => (token ? [] : loadFixedCosts()));
   const [isAddFixedCostOpen, setIsAddFixedCostOpen] = useState(false);
@@ -103,6 +103,7 @@ export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) =
             endMonth: toApiMonth(newCost.endMonth)
           });
 
+          onSynced?.();
           if (created?.id) {
             setFixedCosts(prev =>
               prev.map(fc =>
@@ -155,6 +156,7 @@ export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) =
           startMonth: toApiMonth(updated.startMonth),
           endMonth: toApiMonth(updated.endMonth)
         });
+        onSynced?.();
         if (saved?.categoryName) {
           setFixedCosts(prev => prev.map(fc => (fc.id === id ? { ...fc, category: saved.categoryName } : fc)));
         }
@@ -193,6 +195,7 @@ export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) =
         } else {
           await fixedCostsApi.unpay(id);
         }
+        onSynced?.();
       } catch (err) {
         console.warn('Failed to toggle fixed cost paid status in BE:', err);
       }
@@ -229,6 +232,7 @@ export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) =
           fixedCostIds: syncedIds,
           included
         });
+        onSynced?.();
       } catch (err) {
         console.warn('Failed to sync fixed cost inclusion to BE:', err);
         if (addToast) addToast('บันทึกการเลือกฟิกคอสไปยังเซิร์ฟเวอร์ไม่สำเร็จ', 'danger');
@@ -243,6 +247,7 @@ export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) =
     if (token && id && typeof id === 'string' && id.includes('-') && !id.startsWith('fc-')) {
       try {
         await fixedCostsApi.delete(id);
+        onSynced?.();
       } catch (err) {
         console.warn('Failed to delete fixed cost from BE:', err);
       }
@@ -260,6 +265,7 @@ export const useFixedCostsState = ({ addToast, categories = [], userId } = {}) =
     if (token) {
       try {
         await fixedCostsApi.resetMonthly();
+        onSynced?.();
       } catch (err) {
         console.warn('Failed to reset monthly fixed costs in BE:', err);
       }

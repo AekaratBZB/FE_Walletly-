@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { StatCard } from '../../components/StatCard';
 import { formatCurrency, getCurrentMonthPrefix } from '../../shared/formatters';
+import { isFixedCostIncluded, sumIncludedFixedCosts } from '../fixed-costs/fixedCostPeriod';
 import {
   Coins,
   Hourglass,
@@ -16,11 +17,12 @@ export const ProjectionTab = () => {
 
   const monthlyIncome = Number(allocationSettings.monthlyIncome) || 0;
   const hasData = monthlyIncome > 0 || fixedCosts.length > 0 || transactions.length > 0;
-  const totalFixedCosts = fixedCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-  const unpaidFixedCosts = fixedCosts.filter(c => !c.isPaid).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-
   const now = new Date();
   const currentMonthPrefix = getCurrentMonthPrefix();
+  // ฟิกคอสของเดือนนี้ = อยู่ในระยะเวลาและไม่ถูกติ๊กออก (เหมือนยอดในหน้าภาพรวม)
+  const monthFixedCosts = fixedCosts.filter(c => isFixedCostIncluded(c, currentMonthPrefix));
+  const totalFixedCosts = sumIncludedFixedCosts(fixedCosts, currentMonthPrefix);
+  const unpaidFixedCosts = monthFixedCosts.filter(c => !c.isPaid).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
   const thisMonthExpenses = transactions
     .filter(t => t.type === 'expense' && (t.date || '').startsWith(currentMonthPrefix))
     .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
@@ -59,7 +61,13 @@ export const ProjectionTab = () => {
     const dayOfMonth = targetDate.getDate();
     const dateStr = targetDate.toISOString().slice(0, 10);
 
-    const dueItems = fixedCosts.filter(c => !c.isPaid && c.dueDay === dayOfMonth);
+    // วันที่ข้ามไปเดือนหน้า: สถานะจ่ายแล้วเป็นของเดือนนี้ จึงนับทุกรายการที่มีผลในเดือนนั้น
+    const targetMonth = dateStr.slice(0, 7);
+    const dueItems = fixedCosts.filter(c =>
+      c.dueDay === dayOfMonth &&
+      isFixedCostIncluded(c, targetMonth) &&
+      !(targetMonth === currentMonthPrefix && c.isPaid)
+    );
     const dueTotal = dueItems.reduce((s, c) => s + (Number(c.amount) || 0), 0);
 
     runningBal = runningBal - activeDailySpend - dueTotal;
