@@ -51,6 +51,7 @@ const usePopover = () => {
   useEffect(() => {
     if (!open) return undefined;
     const onPointerDown = (e) => {
+      if (!(e.target instanceof Node)) return;
       if (!panelRef.current?.contains(e.target) && !triggerRef.current?.contains(e.target)) setOpen(false);
     };
     window.addEventListener('mousedown', onPointerDown);
