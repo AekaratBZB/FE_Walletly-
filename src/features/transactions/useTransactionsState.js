@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { loadTransactions, saveTransactions } from './transactionsStorage';
 import { transactionsApi, getStoredToken } from '../../shared/api';
+import { mapTransactionDto } from './transactionMapping';
 
 // กันโหลดไม่รู้จบถ้า BE ตอบ totalPages ผิดปกติ (100 หน้า x 100 รายการ)
 const MAX_TRANSACTION_PAGES = 100;
@@ -29,16 +30,7 @@ export const useTransactionsState = ({ addToast, categories = [], userId, onSync
       page++;
     } while (page <= totalPages && page <= MAX_TRANSACTION_PAGES);
 
-    return items.map(dto => ({
-      id: dto.id,
-      date: dto.txDate,
-      type: dto.type,
-      category: dto.categoryName || 'ทั่วไป',
-      categoryId: dto.categoryId,
-      amount: Number(dto.amount) || 0,
-      paymentMethod: dto.paymentMethodName || '',
-      note: dto.note || ''
-    }));
+    return items.map(mapTransactionDto);
   };
 
   // โหลดรายการใหม่จาก BE (เช่น หลังฝากเงินออมที่ BE สร้าง transaction ให้เอง)
@@ -119,7 +111,8 @@ export const useTransactionsState = ({ addToast, categories = [], userId, onSync
               prev.map(t => (t.id === newTx.id ? { ...t, id: created.id } : t))
             );
           }
-          onSynced?.();
+          // BE อาจลบ/ผูกแถวอัตโนมัติของเดือนนั้นแทน (รายรับประจำ/ฟิกคอส) จึงโหลดรายการใหม่ (เรียก onSynced ในตัว)
+          await reloadTransactions();
         }
       } catch (err) {
         console.warn('Failed to sync new transaction to BE:', err);
