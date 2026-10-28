@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { formatCurrency, formatDate, formatMonthKey, getCurrentMonthPrefix } from '../../shared/formatters';
 import { addMonths } from '../fixed-costs/fixedCostPeriod';
@@ -35,6 +35,7 @@ export const TransactionsTab = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [editingProjected, setEditingProjected] = useState(null);
+  const excludingRef = useRef(false);
 
   const period = { periodMode, month, startDate, endDate };
   const periodLabel =
@@ -83,14 +84,33 @@ export const TransactionsTab = () => {
     reloadProjected();
   };
 
-  const handleDelete = (t) => {
+  const RELOAD_FAILED = 'บันทึกแล้ว แต่โหลดรายการใหม่ไม่สำเร็จ';
+
+  const handleDelete = async (t) => {
     if (t.sourceType || t.isProjected) {
       if (!window.confirm(`ไม่นับ "${t.category}" ในเดือน ${formatMonthKey(t.sourcePeriod)} ใช่หรือไม่?`)) return;
       if (t.isProjected) {
-        recurringEntriesApi
-          .exclude({ sourceType: t.sourceType, sourceId: t.sourceId, period: t.sourcePeriod })
-          .then(refreshAll)
-          .catch(err => addToast?.(err?.message || 'ไม่สามารถยกเว้นรายการได้', 'danger'));
+        if (excludingRef.current) return;
+        excludingRef.current = true;
+        try {
+          try {
+            await recurringEntriesApi.exclude({
+              sourceType: t.sourceType,
+              sourceId: t.sourceId,
+              period: t.sourcePeriod
+            });
+          } catch (err) {
+            addToast?.(err?.message || 'ไม่สามารถยกเว้นรายการได้', 'danger');
+            return;
+          }
+          try {
+            await refreshAll();
+          } catch {
+            addToast?.(RELOAD_FAILED, 'danger');
+          }
+        } finally {
+          excludingRef.current = false;
+        }
         return;
       }
     } else if (!window.confirm(`ต้องการลบรายการ "${t.category}" ใช่หรือไม่?`)) {
@@ -115,7 +135,12 @@ export const TransactionsTab = () => {
       return;
     }
     setEditingProjected(null);
-    await refreshAll();
+    // materialize สำเร็จแล้ว: ถ้าโหลดซ้ำพลาดให้แจ้งแยก ไม่ปล่อยเป็น unhandled rejection
+    try {
+      await refreshAll();
+    } catch {
+      addToast?.(RELOAD_FAILED, 'danger');
+    }
   };
 
   return (

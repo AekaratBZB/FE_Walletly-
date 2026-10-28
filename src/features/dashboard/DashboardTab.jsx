@@ -39,6 +39,9 @@ export const DashboardTab = () => {
   const currentMonthPrefix = getCurrentMonthPrefix();
   // ตัวเลขสรุปทั้งหมดมาจาก BE (แหล่งเดียว) ฝั่ง FE ใช้รายการฟิกคอสแค่แสดงช่องติ๊ก
   const { summary, error, isLoading, reload } = useMonthlySummary(currentMonthPrefix, !isGuest);
+  const projectedIncome = summary?.projectedIncome ?? 0;
+  const projectedFixedCosts = summary?.projectedFixedCosts ?? 0;
+  const hasProjected = projectedIncome > 0 || projectedFixedCosts > 0;
   const showValue = (value) => (summary ? formatCurrency(value) : isLoading ? 'กำลังโหลด…' : '-');
 
   // ช่องติ๊กของรายการฟิกคอสที่อยู่ในระยะเวลาเดือนนี้ (ติ๊ก = นับเป็นรายจ่าย)
@@ -108,7 +111,14 @@ export const DashboardTab = () => {
             <StatCard
               label="รายรับรวมเดือนนี้"
               value={showValue(summary?.totalIncome)}
-              subtext="เงินเดือน + รายได้เสริม"
+              subtext={
+                <>
+                  <div>เงินเดือน + รายได้เสริม</div>
+                  {projectedIncome > 0 && (
+                    <div className="text-xs text-muted">+ รอเข้า {formatCurrency(projectedIncome)}</div>
+                  )}
+                </>
+              }
               icon={Wallet}
               colorScheme="emerald"
               valueClass="text-success"
@@ -126,7 +136,16 @@ export const DashboardTab = () => {
             <StatCard
               label="ยอดเงินคงเหลือสุทธิ"
               value={showValue(summary?.netRemaining)}
-              subtext="รายรับ หัก รายจ่ายและเงินออม"
+              subtext={
+                <>
+                  <div>รายรับ หัก รายจ่ายและเงินออม</div>
+                  {hasProjected && (
+                    <div className="text-xs text-muted">
+                      คาดการณ์สิ้นเดือน {formatCurrency(summary?.projectedBalance ?? 0)}
+                    </div>
+                  )}
+                </>
+              }
               icon={Banknote}
               colorScheme="blue"
               variant="dark"
