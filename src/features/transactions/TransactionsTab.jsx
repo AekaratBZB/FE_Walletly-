@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { formatCurrency, formatDate, formatMonthKey, getCurrentMonthPrefix } from '../../shared/formatters';
 import { addMonths } from '../fixed-costs/fixedCostPeriod';
 import { ThaiDatePicker, ThaiMonthPicker } from '../../components/ThaiDatePicker';
-import { Search, Plus, Trash2, Download, ReceiptText, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, Trash2, Download, ReceiptText, X, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
+import { recurringEntriesApi } from '../../shared/api';
+import { mergeWithProjected, periodToRange } from './transactionMapping';
+import { useProjectedEntries } from './useProjectedEntries';
+import { ProjectedEntryModal } from './ProjectedEntryModal';
 
 // 'month' = รายเดือน (ค่าเริ่มต้น: เดือนปัจจุบัน), 'range' = ช่วงวันที่, 'all' = ทั้งหมด
 const matchPeriod = (date, { periodMode, month, startDate, endDate }) => {
@@ -17,6 +21,8 @@ export const TransactionsTab = () => {
   const {
     transactions,
     deleteTransaction,
+    reloadTransactions,
+    addToast,
     setIsAddTxOpen,
     exportTransactionsCSV
   } = useWallet();
@@ -28,6 +34,7 @@ export const TransactionsTab = () => {
   const [month, setMonth] = useState(currentMonth);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [editingProjected, setEditingProjected] = useState(null);
 
   const period = { periodMode, month, startDate, endDate };
   const periodLabel =
@@ -46,7 +53,13 @@ export const TransactionsTab = () => {
     setEndDate('');
   };
 
-  const filteredTransactions = transactions.filter(t => {
+  const range = useMemo(
+    () => periodToRange({ periodMode, month, startDate, endDate }),
+    [periodMode, month, startDate, endDate]
+  );
+  const { projected, reload: reloadProjected } = useProjectedEntries(range);
+
+  const matchFilters = t => {
     if (!matchPeriod(t.date, period)) return false;
     const matchType = filterType === 'all' || t.type === filterType;
     const term = searchTerm.toLowerCase().trim();
@@ -58,12 +71,51 @@ export const TransactionsTab = () => {
       (t.date || '').includes(term);
 
     return matchType && matchSearch;
-  });
+  };
 
-  const handleDelete = (id, category) => {
-    if (window.confirm(`ต้องการลบรายการ "${category}" ใช่หรือไม่?`)) {
-      deleteTransaction(id);
+  const filteredTransactions = mergeWithProjected(
+    transactions.filter(matchFilters),
+    projected.filter(matchFilters)
+  );
+
+  const refreshAll = async () => {
+    await reloadTransactions?.();
+    reloadProjected();
+  };
+
+  const handleDelete = (t) => {
+    if (t.sourceType || t.isProjected) {
+      if (!window.confirm(`ไม่นับ "${t.category}" ในเดือน ${formatMonthKey(t.sourcePeriod)} ใช่หรือไม่?`)) return;
+      if (t.isProjected) {
+        recurringEntriesApi
+          .exclude({ sourceType: t.sourceType, sourceId: t.sourceId, period: t.sourcePeriod })
+          .then(refreshAll)
+          .catch(err => addToast?.(err?.message || 'ไม่สามารถยกเว้นรายการได้', 'danger'));
+        return;
+      }
+    } else if (!window.confirm(`ต้องการลบรายการ "${t.category}" ใช่หรือไม่?`)) {
+      return;
     }
+    deleteTransaction(t.id);
+  };
+
+  const handleMaterialize = async ({ amount, txDate, note }) => {
+    const e = editingProjected;
+    try {
+      await recurringEntriesApi.materialize({
+        sourceType: e.sourceType,
+        sourceId: e.sourceId,
+        period: e.sourcePeriod,
+        amount,
+        txDate,
+        note
+      });
+    } catch (err) {
+      addToast?.(err?.message || 'ไม่สามารถบันทึกรายการได้', 'danger');
+      return;
+    }
+    setEditingProjected(null);
+    await refreshAll();
   };
 
   return (
@@ -172,7 +224,6 @@ export const TransactionsTab = () => {
               <button
                 className="btn btn-outline btn-sm"
                 onClick={() => setMonth(addMonths(month, 1))}
-                disabled={month >= currentMonth}
                 title="เดือนถัดไป"
                 aria-label="เดือนถัดไป"
               >
@@ -224,14 +275,14 @@ export const TransactionsTab = () => {
                 <th>ช่องทางชำระ</th>
                 <th>หมายเหตุ</th>
                 <th className="text-right">จำนวนเงิน</th>
-                <th className="text-right" style={{ width: '80px' }}>จัดการ</th>
+                <th className="text-right" style={{ width: '110px' }}>จัดการ</th>
               </tr>
             </thead>
             <tbody>
               {filteredTransactions.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="text-center text-muted" style={{ padding: '3rem 1rem' }}>
-                    {transactions.length === 0 ? (
+                    {transactions.length === 0 && projected.length === 0 ? (
                       <>
                         <div className="tx-empty-icon">
                           <ReceiptText size={22} />
@@ -284,11 +335,17 @@ export const TransactionsTab = () => {
                   }
 
                   return (
-                    <tr key={t.id}>
+                    <tr
+                      key={t.isProjected ? `p-${t.sourceType}-${t.sourceId}-${t.sourcePeriod}` : t.id}
+                      style={t.isProjected ? { opacity: 0.65 } : undefined}
+                    >
                       <td className="num-font text-xs text-muted" style={{ whiteSpace: 'nowrap' }}>
                         {formatDate(t.date)}
                       </td>
-                      <td>{typeBadge}</td>
+                      <td>
+                        {typeBadge}
+                        {t.isProjected && <span className="badge" style={{ marginLeft: 4 }}>รอดำเนินการ</span>}
+                      </td>
                       <td style={{ fontWeight: 600 }}>
                         {t.category}
                       </td>
@@ -312,9 +369,18 @@ export const TransactionsTab = () => {
                         {sign}{formatCurrency(t.amount)}
                       </td>
                       <td className="text-right">
+                        {t.isProjected && (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setEditingProjected(t)}
+                            title="แก้ไขยอดเดือนนี้"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                        )}
                         <button
                           className="btn btn-ghost btn-sm"
-                          onClick={() => handleDelete(t.id, t.category)}
+                          onClick={() => handleDelete(t)}
                           title="ลบรายการ"
                           style={{ color: 'var(--danger)' }}
                         >
@@ -329,6 +395,14 @@ export const TransactionsTab = () => {
           </table>
         </div>
       </div>
+
+      {editingProjected && (
+        <ProjectedEntryModal
+          entry={editingProjected}
+          onClose={() => setEditingProjected(null)}
+          onSave={handleMaterialize}
+        />
+      )}
     </div>
   );
 };
