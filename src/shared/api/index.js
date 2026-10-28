@@ -2,6 +2,8 @@ export * from './client';
 export * from './authApi';
 export * from './transactionsApi';
 export * from './fixedCostsApi';
+export * from './recurringIncomesApi';
+export * from './recurringEntriesApi';
 export * from './savingsApi';
 export * from './debtsApi';
 export * from './allocationsApi';
