@@ -156,11 +156,18 @@ export const DashboardTab = () => {
               label="ฟิกคอสประจำเดือน"
               value={showValue(summary?.totalFixedCosts)}
               subtext={
-                !summary
-                  ? ' '
-                  : summary.fixedCostsActiveCount === 0
-                    ? 'ยังไม่มีฟิกคอสเดือนนี้'
-                    : `นับในรายจ่าย ${summary.fixedCostsIncludedCount}/${summary.fixedCostsActiveCount} รายการ`
+                <>
+                  <div>
+                    {!summary
+                      ? ' '
+                      : summary.fixedCostsActiveCount === 0
+                        ? 'ยังไม่มีฟิกคอสเดือนนี้'
+                        : `นับในรายจ่าย ${summary.fixedCostsIncludedCount}/${summary.fixedCostsActiveCount} รายการ`}
+                  </div>
+                  {projectedFixedCosts > 0 && (
+                    <div className="text-xs text-muted">+ รอตัด {formatCurrency(projectedFixedCosts)}</div>
+                  )}
+                </>
               }
               icon={CalendarClock}
               colorScheme="orange"

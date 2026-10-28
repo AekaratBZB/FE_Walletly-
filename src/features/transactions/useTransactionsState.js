@@ -111,7 +111,8 @@ export const useTransactionsState = ({ addToast, categories = [], userId, onSync
               prev.map(t => (t.id === newTx.id ? { ...t, id: created.id } : t))
             );
           }
-          onSynced?.();
+          // BE อาจลบ/ผูกแถวอัตโนมัติของเดือนนั้นแทน (รายรับประจำ/ฟิกคอส) จึงโหลดรายการใหม่ (เรียก onSynced ในตัว)
+          await reloadTransactions();
         }
       } catch (err) {
         console.warn('Failed to sync new transaction to BE:', err);

@@ -103,7 +103,6 @@ export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced
             endMonth: toApiMonth(newCost.endMonth)
           });
 
-          onSynced?.();
           if (created?.id) {
             setFixedCosts(prev =>
               prev.map(fc =>
@@ -113,6 +112,9 @@ export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced
               )
             );
           }
+          // BE สร้างแถวอัตโนมัติของเดือนที่ถึงวันแล้ว จึงโหลดรายการใหม่ (เรียก onSynced ในตัว)
+          if (reloadTransactions) await reloadTransactions();
+          else onSynced?.();
         }
       } catch (err) {
         console.warn('Failed to sync new fixed cost to BE:', err);
@@ -235,7 +237,9 @@ export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced
           fixedCostIds: syncedIds,
           included
         });
-        onSynced?.();
+        // ติ๊กออกทำให้ BE ลบแถวอัตโนมัติของเดือนนั้น จึงโหลดรายการใหม่ (เรียก onSynced ในตัว)
+        if (reloadTransactions) await reloadTransactions();
+        else onSynced?.();
       } catch (err) {
         console.warn('Failed to sync fixed cost inclusion to BE:', err);
         if (addToast) addToast('บันทึกการเลือกฟิกคอสไปยังเซิร์ฟเวอร์ไม่สำเร็จ', 'danger');

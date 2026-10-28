@@ -185,7 +185,7 @@ For a past month everything is real, so projected fields are 0. For a future mon
 | Method | Path | Note |
 |--------|------|------|
 | GET/POST/PUT/DELETE | `/recurring-incomes` | CRUD, PUT accepts `effectiveFrom` |
-| POST | `/recurring-incomes/{id}/inclusion` | tick/untick a month, mirrors fixed costs |
+| PUT | `/recurring-incomes/inclusion` | body `{ periodMonth, recurringIncomeIds, included }`; tick/untick a month, mirrors fixed costs |
 | GET | `/transactions` | materializes first; DTO + `isProjected` (always false here), `sourceType`, `sourceId`, `sourcePeriod`, `isUserModified` |
 | GET | `/recurring-entries/projected?startDate&endDate` | projected rows, same DTO, `isProjected = true` |
 | POST | `/recurring-entries/materialize` | edit a projected row |
