@@ -31,6 +31,8 @@ export const AddFixedCostModal = () => {
   const [startMonth, setStartMonth] = useState(getCurrentMonthPrefix);
   // ว่าง = ไม่มีกำหนดสิ้นสุด (เช่น ค่าเน็ต), ระบุ = จำนวนงวด (เช่น ผ่อนรถ 48 เดือน)
   const [durationMonths, setDurationMonths] = useState('');
+  // เฉพาะตอนแก้ไข: เดือนที่ค่าใหม่เริ่มมีผล
+  const [effectiveFrom, setEffectiveFrom] = useState(getCurrentMonthPrefix);
 
   useEffect(() => {
     if (!isAddFixedCostOpen) return;
@@ -44,6 +46,7 @@ export const AddFixedCostModal = () => {
     // รายการเก่าที่ไม่มีเดือนเริ่ม ปล่อยว่างไว้ จะได้ไม่เปลี่ยนเดือนที่นับย้อนหลัง
     setStartMonth(fc ? fc.startMonth || '' : getCurrentMonthPrefix());
     setDurationMonths(fc ? String(getDurationMonths(fc) || '') : '');
+    setEffectiveFrom(getCurrentMonthPrefix());
   }, [isAddFixedCostOpen, editingFixedCost]);
 
   const numDuration = parseInt(durationMonths, 10);
@@ -90,7 +93,8 @@ export const AddFixedCostModal = () => {
     if (editingFixedCost) {
       updateFixedCost(editingFixedCost.id, {
         ...data,
-        categoryId: data.categoryId || editingFixedCost.categoryId
+        categoryId: data.categoryId || editingFixedCost.categoryId,
+        effectiveFrom
       });
     } else {
       addFixedCost({ ...data, startMonth: startMonth || getCurrentMonthPrefix() });
@@ -180,6 +184,13 @@ export const AddFixedCostModal = () => {
             ? `นับเป็นรายจ่ายทุกเดือน ${formatMonthKey(startMonth)} – ${formatMonthKey(endMonth)} (${numDuration} เดือน)`
             : 'นับเป็นรายจ่ายทุกเดือนโดยไม่มีกำหนดสิ้นสุด'}
         </div>
+
+        {editingFixedCost && (
+          <div className="form-group">
+            <label className="form-label">มีผลตั้งแต่เดือน</label>
+            <ThaiMonthPicker value={effectiveFrom} onChange={setEffectiveFrom} ariaLabel="มีผลตั้งแต่เดือน" />
+          </div>
+        )}
 
         {/* Category */}
         <div className="form-group">

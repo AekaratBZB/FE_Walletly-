@@ -201,6 +201,7 @@ export const WalletProvider = ({ children }) => {
         clearAllData,
         categories,
         dataVersion,
+        onSynced,
         ...transactionsSlice,
         ...fixedCostsSlice,
         ...savingsSlice,

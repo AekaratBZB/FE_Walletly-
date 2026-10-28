@@ -154,7 +154,8 @@ export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced
           linkedDebtId: updated.linkedDebtId || null,
           note: updated.note || '',
           startMonth: toApiMonth(updated.startMonth),
-          endMonth: toApiMonth(updated.endMonth)
+          endMonth: toApiMonth(updated.endMonth),
+          effectiveFrom: toApiMonth(changes.effectiveFrom)
         });
         onSynced?.();
         if (saved?.categoryName) {
