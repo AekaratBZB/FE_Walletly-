@@ -7,7 +7,7 @@ import { toApiMonth, toMonthKey } from './fixedCostPeriod';
 // id ที่ BE สร้าง (GUID) ไม่ใช่ id ชั่วคราวฝั่ง FE ('fc-...')
 const isSyncedId = (id) => typeof id === 'string' && id.includes('-') && !id.startsWith('fc-');
 
-export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced } = {}) => {
+export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced, reloadTransactions } = {}) => {
   const token = getStoredToken();
   const [fixedCosts, setFixedCosts] = useState(() => (token ? [] : loadFixedCosts()));
   const [isAddFixedCostOpen, setIsAddFixedCostOpen] = useState(false);
@@ -157,7 +157,9 @@ export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced
           endMonth: toApiMonth(updated.endMonth),
           effectiveFrom: toApiMonth(changes.effectiveFrom)
         });
-        onSynced?.();
+        // แก้ค่าตั้งแต่เดือนที่กำหนดทำให้ยอดรายการที่ BE สร้างให้เปลี่ยน จึงโหลดรายการใหม่ (เรียก onSynced ในตัว)
+        if (reloadTransactions) await reloadTransactions();
+        else onSynced?.();
         if (saved?.categoryName) {
           setFixedCosts(prev => prev.map(fc => (fc.id === id ? { ...fc, category: saved.categoryName } : fc)));
         }

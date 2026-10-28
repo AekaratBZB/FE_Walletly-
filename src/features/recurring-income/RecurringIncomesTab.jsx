@@ -8,15 +8,16 @@ import { RecurringIncomeModal } from './RecurringIncomeModal';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 export const RecurringIncomesTab = () => {
-  const { categories = [], allocationSettings, addToast, onSynced } = useWallet();
+  const { categories = [], allocationSettings, addToast, reloadTransactions } = useWallet();
   const { user } = useAuth();
   const { items, isLoading, hasToken, create, update, remove } = useRecurringIncomesState({
     userId: user?.id,
-    onSynced,
+    reloadTransactions,
     addToast
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [isAddingSalary, setIsAddingSalary] = useState(false);
 
   if (!hasToken) {
     return (
@@ -39,10 +40,16 @@ export const RecurringIncomesTab = () => {
     if (ok) close();
   };
 
-  const useSalary = () => {
+  const useSalary = async () => {
+    if (isAddingSalary) return;
     const category = incomeCategories.find(c => c.name.includes('เงินเดือน')) || incomeCategories[0];
     if (!category) return;
-    create({ title: 'เงินเดือน', amount: monthlyIncome, payDay: 1, categoryId: category.id });
+    setIsAddingSalary(true);
+    try {
+      await create({ title: 'เงินเดือน', amount: monthlyIncome, payDay: 1, categoryId: category.id });
+    } finally {
+      setIsAddingSalary(false);
+    }
   };
 
   return (
@@ -57,12 +64,16 @@ export const RecurringIncomesTab = () => {
         </button>
       </div>
 
-      {items.length === 0 && !isLoading ? (
+      {isLoading && items.length === 0 ? (
+        <div className="card text-center text-muted" style={{ padding: '2rem' }}>กำลังโหลด...</div>
+      ) : items.length === 0 ? (
         <div className="card text-center" style={{ padding: '2rem' }}>
-          {monthlyIncome > 0 && incomeCategories.length > 0 && (
-            <button className="btn btn-primary" onClick={useSalary}>
+          {monthlyIncome > 0 && incomeCategories.length > 0 ? (
+            <button className="btn btn-primary" onClick={useSalary} disabled={isAddingSalary}>
               ใช้เงินเดือน {formatCurrency(monthlyIncome)} จากหน้าแบ่งสัดส่วน
             </button>
+          ) : (
+            <span className="text-muted">ยังไม่มีรายรับประจำ กด "เพิ่มรายรับประจำ" เพื่อเริ่ม</span>
           )}
         </div>
       ) : (

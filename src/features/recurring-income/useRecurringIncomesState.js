@@ -17,14 +17,15 @@ const mapDto = (dto) => ({
 });
 
 // state ของรายรับประจำอยู่ในแท็บนี้เอง (ไม่ผ่าน WalletContext); onSynced ให้รายการ/สรุปยอดโหลดใหม่หลังบันทึก
-export const useRecurringIncomesState = ({ userId, onSynced, addToast } = {}) => {
+export const useRecurringIncomesState = ({ userId, reloadTransactions, addToast } = {}) => {
   const hasToken = !!getStoredToken();
   const [items, setItems] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(hasToken);
 
   const load = useCallback(async () => {
     if (!getStoredToken() || !userId) {
       setItems([]);
+      setIsLoading(false);
       return;
     }
     setIsLoading(true);
@@ -45,7 +46,8 @@ export const useRecurringIncomesState = ({ userId, onSynced, addToast } = {}) =>
   const run = async (action, okMsg, failMsg) => {
     try {
       await action();
-      onSynced?.();
+      // BE สร้างรายการจริงตอนอ่าน จึงต้องโหลดรายการใหม่ (เรียก onSynced ในตัว)
+      await reloadTransactions?.();
       await load();
       if (okMsg) addToast?.(okMsg, 'success');
       return true;
