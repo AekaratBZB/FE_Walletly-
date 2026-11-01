@@ -131,13 +131,11 @@ The FE loads every transaction once (`GET /transactions`, all pages, no date ran
 - `GET /transactions` runs the materializer first. Without a date range it materializes from each source's effective start up to today.
 - Projected rows come from a separate `GET /recurring-entries/projected?startDate&endDate`; the transactions tab calls it for the period on screen and merges the rows in the browser. `/transactions` paging and counts stay real-rows only.
 
-### 5.4 Manual salary replaces automatic salary
+### 5.4 Manual income is always additional
 
-If in month `M` a user has an income transaction they entered themselves (`recurring_income_id is null`) in the **same category** as recurring income `S`, then `S` is suppressed in `M`: no projected row, no materialized row.
+An income transaction the user enters themselves (`recurring_income_id is null`) is a new amount on top of recurring income, even in the same category. It never suppresses, deletes or replaces the projected or materialized row of a recurring income. To skip a month of salary the user excludes that entry (`recurring_income_exclusions`, 4.2) or deletes the auto row.
 
-When the user creates such a manual income and an unmodified auto row of `S` for that month already exists, the create handler deletes the auto row in the same save. If the auto row was user-modified, keep both and let the user decide.
-
-Applies to recurring income only. Fixed costs are not suppressed by manual expenses.
+(Changed 2026-11-01: earlier versions let a same-category manual income replace the auto salary row.)
 
 ### 5.5 Editing a row
 
@@ -226,7 +224,7 @@ BE unit tests (`Walletly.Tests`):
 - Entry date clamping (31 → Feb 28/29).
 - Materializer: creates up to today only; idempotent; respects exclusions, start/end month, suppression; duplicate insert race ignored.
 - Projected entries: only after today; range guard.
-- Summary: past month all real, current month split, future month all projected; manual salary not double counted; `fixed` rows counted once.
+- Summary: past month all real, current month split, future month all projected; manual income counted on top of recurring income; `fixed` rows counted once.
 - Source edit with `effectiveFrom`: updates only unmodified rows from that month.
 - Pay endpoint reuses existing row.
 - Delete auto row adds exclusion and is not recreated.

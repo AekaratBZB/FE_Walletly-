@@ -103,7 +103,7 @@ export const useTransactionsState = ({ addToast, categories = [], userId, onSync
               prev.map(t => (t.id === newTx.id ? { ...t, id: created.id } : t))
             );
           }
-          // BE อาจลบ/ผูกแถวอัตโนมัติของเดือนนั้นแทน (รายรับประจำ/ฟิกคอส) จึงโหลดรายการใหม่ (เรียก onSynced ในตัว)
+          // BE อาจผูกฟิกคอสที่บันทึกเองแทนแถวอัตโนมัติของเดือนนั้น จึงโหลดรายการใหม่ (เรียก onSynced ในตัว)
           await reloadTransactions();
         }
       } catch (err) {
