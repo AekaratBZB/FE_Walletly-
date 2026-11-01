@@ -84,7 +84,7 @@ export const RecurringIncomesTab = () => {
             disabled={incomeCategories.length === 0}
           >
             <Plus size={14} />
-            <span>+ เพิ่มรายรับประจำ</span>
+            <span>เพิ่มรายรับประจำ</span>
           </button>
         </div>
       </div>
@@ -162,7 +162,7 @@ export const RecurringIncomesTab = () => {
                       </button>
                     ) : (
                       <div style={{ fontSize: '0.85rem', marginTop: '4px' }}>
-                        กดปุ่ม "+ เพิ่มรายรับประจำ" เพื่อบันทึกรายรับที่เข้าทุกเดือน
+                        กดปุ่ม "เพิ่มรายรับประจำ" เพื่อบันทึกรายรับที่เข้าทุกเดือน
                       </div>
                     )}
                   </td>
