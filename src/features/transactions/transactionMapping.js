@@ -14,6 +14,22 @@ export const mapTransactionDto = (dto) => ({
   isUserModified: dto.isUserModified === true
 });
 
+const normalizeName = (name) => String(name || '').toLowerCase().replace(/\s+/g, '');
+
+// หา categoryId จากชื่อหมวด: ชื่อตรง > ชื่อตรงเมื่อไม่สนช่องว่าง > หมวด "อื่น" ของประเภทเดียวกัน > หมวดแรกของประเภทนั้น
+// ห้ามเลือกหมวดแรกของประเภทก่อนเช็คชื่อ: รายรับจะตกไปหมวดเงินเดือน แล้ว BE ลบแถวเงินเดือนอัตโนมัติของเดือนนั้นทิ้ง
+export const resolveCategoryId = (tx, categories = []) => {
+  if (tx.categoryId) return tx.categoryId;
+  const sameType = categories.filter(c => c.type === tx.type);
+  const name = normalizeName(tx.category);
+  const match =
+    sameType.find(c => c.name === tx.category) ||
+    sameType.find(c => normalizeName(c.name) === name) ||
+    sameType.find(c => c.name.includes('อื่น')) ||
+    sameType[0];
+  return match?.id ?? null;
+};
+
 // เดือน -> วันแรก/วันสุดท้าย (คำนวณวันสุดท้ายจริง เช่น ก.พ. 2570 = 28), ช่วงวันที่ต้องครบทั้งสองฝั่ง
 export const periodToRange = ({ periodMode, month, startDate, endDate } = {}) => {
   if (periodMode === 'month' && month) {

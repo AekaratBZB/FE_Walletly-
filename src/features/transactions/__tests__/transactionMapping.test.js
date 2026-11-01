@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapTransactionDto, periodToRange, mergeWithProjected } from '../transactionMapping';
+import { mapTransactionDto, periodToRange, mergeWithProjected, resolveCategoryId } from '../transactionMapping';
 
 describe('mapTransactionDto', () => {
   it('maps a plain dto with defaults', () => {
@@ -69,5 +69,35 @@ describe('mergeWithProjected', () => {
 
   it('handles missing projected', () => {
     expect(mergeWithProjected([{ id: 1, date: '2027-01-01' }], undefined)).toHaveLength(1);
+  });
+});
+
+describe('resolveCategoryId', () => {
+  const cats = [
+    { id: 'salary', type: 'income', name: 'เงินเดือน (Salary)' },
+    { id: 'bonus', type: 'income', name: 'โบนัส (Bonus)' },
+    { id: 'other-in', type: 'income', name: 'อื่นๆ' },
+    { id: 'travel', type: 'expense', name: 'การเดินทาง / น้ำมัน' },
+    { id: 'food', type: 'expense', name: 'อาหารและเครื่องดื่ม' }
+  ];
+
+  it('keeps an explicit categoryId', () => {
+    expect(resolveCategoryId({ categoryId: 'x', category: 'โบนัส (Bonus)', type: 'income' }, cats)).toBe('x');
+  });
+
+  it('prefers the exact name over the first category of the same type', () => {
+    expect(resolveCategoryId({ category: 'โบนัส (Bonus)', type: 'income' }, cats)).toBe('bonus');
+  });
+
+  it('matches names that differ only in spacing', () => {
+    expect(resolveCategoryId({ category: 'การเดินทาง/น้ำมัน', type: 'expense' }, cats)).toBe('travel');
+  });
+
+  it('falls back to an "other" category of the same type, not the salary one', () => {
+    expect(resolveCategoryId({ category: 'ขายของออนไลน์', type: 'income' }, cats)).toBe('other-in');
+  });
+
+  it('returns null when no category of that type exists', () => {
+    expect(resolveCategoryId({ category: 'x', type: 'savings' }, cats)).toBeNull();
   });
 });

@@ -6,7 +6,13 @@ import { TRANSACTION_CATEGORIES, PAYMENT_METHODS } from '../../shared/constants'
 import { getTodayDateString } from '../../shared/formatters';
 
 export const AddTransactionModal = () => {
-  const { isAddTxOpen, setIsAddTxOpen, addTransaction } = useWallet();
+  const { isAddTxOpen, setIsAddTxOpen, addTransaction, categories: allCategories = [] } = useWallet();
+
+  // ล็อกอินแล้วใช้หมวดหมู่จริงจาก BE เพื่อให้ได้ categoryId ที่ถูกต้อง (ชื่อในเครื่องไม่ตรงกับ BE ทุกตัว)
+  const getCategoryOptions = (t) => {
+    const be = allCategories.filter(c => c.type === t).map(c => c.name);
+    return be.length > 0 ? be : TRANSACTION_CATEGORIES[t] || TRANSACTION_CATEGORIES.expense;
+  };
 
   const [type, setType] = useState('expense');
   const [amount, setAmount] = useState('');
@@ -17,9 +23,9 @@ export const AddTransactionModal = () => {
 
   // Update category when type changes
   useEffect(() => {
-    const cats = TRANSACTION_CATEGORIES[type] || TRANSACTION_CATEGORIES.expense;
-    setCategory(cats[0] || '');
-  }, [type]);
+    setCategory(getCategoryOptions(type)[0] || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, allCategories]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -29,10 +35,12 @@ export const AddTransactionModal = () => {
       return;
     }
 
+    const beCategory = allCategories.find(c => c.type === type && c.name === category);
     addTransaction({
       type,
       amount: numAmount,
       category,
+      categoryId: beCategory?.id,
       date: date || getTodayDateString(),
       paymentMethod,
       note: note.trim()
@@ -45,7 +53,7 @@ export const AddTransactionModal = () => {
     setIsAddTxOpen(false);
   };
 
-  const categories = TRANSACTION_CATEGORIES[type] || TRANSACTION_CATEGORIES.expense;
+  const categories = getCategoryOptions(type);
 
   return (
     <Modal

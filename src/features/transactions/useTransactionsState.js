@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { loadTransactions, saveTransactions } from './transactionsStorage';
 import { transactionsApi, getStoredToken } from '../../shared/api';
-import { mapTransactionDto } from './transactionMapping';
+import { mapTransactionDto, resolveCategoryId } from './transactionMapping';
 
 // กันโหลดไม่รู้จบถ้า BE ตอบ totalPages ผิดปกติ (100 หน้า x 100 รายการ)
 const MAX_TRANSACTION_PAGES = 100;
@@ -86,16 +86,8 @@ export const useTransactionsState = ({ addToast, categories = [], userId, onSync
     const token = getStoredToken();
     if (token) {
       try {
-        // Resolve categoryId
-        let categoryId = tx.categoryId;
-        if (!categoryId && categories.length > 0) {
-          const match = categories.find(
-            c =>
-              c.name.toLowerCase() === (tx.category || '').toLowerCase() ||
-              c.type === tx.type
-          );
-          categoryId = match?.id || categories[0]?.id;
-        }
+        const categoryId = resolveCategoryId(tx, categories);
+        if (!categoryId) console.warn(`No ${tx.type} category to sync transaction to BE`);
 
         if (categoryId) {
           const created = await transactionsApi.create({
