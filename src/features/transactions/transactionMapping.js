@@ -43,14 +43,24 @@ export const buildUpdatePayload = (original, changes, { categoryId, paymentMetho
   isRecurring: original.isRecurring === true
 });
 
-// ยอดเงินรวมจากรายการจริงถึงวันนี้ (ไม่นับรายการคาดการณ์): รายรับ/เงินเดือน - รายจ่าย - ฟิกคอส - เงินออม
-export const summarizeWallet = (transactions = [], today) => {
+// ยอดเงินรวมถึงสิ้นเดือนนี้: รายรับ/เงินเดือน - รายจ่าย - ฟิกคอส - เงินออม
+// projected = รายการรอดำเนินการของเดือนนี้ (เงินเดือน/ฟิกคอสที่ยังไม่ถึงวัน) นับรวมด้วย
+export const summarizeWallet = (transactions = [], projected = [], monthEnd) => {
   const totals = { income: 0, expense: 0, fixed: 0, savings: 0 };
-  for (const t of transactions) {
-    if (t.isProjected || (today && t.date > today)) continue;
-    if (t.type in totals) totals[t.type] += Number(t.amount) || 0;
+  let pendingIncome = 0;
+  const rows = [...transactions.filter(t => !t.isProjected), ...projected];
+  for (const t of rows) {
+    if (monthEnd && t.date > monthEnd) continue;
+    if (!(t.type in totals)) continue;
+    const amount = Number(t.amount) || 0;
+    totals[t.type] += amount;
+    if (t.isProjected && t.type === 'income') pendingIncome += amount;
   }
-  return { ...totals, balance: totals.income - totals.expense - totals.fixed - totals.savings };
+  return {
+    ...totals,
+    pendingIncome,
+    balance: totals.income - totals.expense - totals.fixed - totals.savings
+  };
 };
 
 const normalizeName = (name) => String(name || '').toLowerCase().replace(/\s+/g, '');

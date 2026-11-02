@@ -40,16 +40,25 @@ describe('isLinkedTransaction', () => {
 });
 
 describe('summarizeWallet', () => {
-  it('sums actual rows up to today and skips projected/future', () => {
-    const s = summarizeWallet([
-      { type: 'income', amount: 30000, date: '2026-10-25' },
-      { type: 'expense', amount: 2000, date: '2026-10-26' },
-      { type: 'fixed', amount: 8000, date: '2026-11-01' },
-      { type: 'savings', amount: 5000, date: '2026-11-01' },
-      { type: 'expense', amount: 999, date: '2026-11-30' },
-      { type: 'income', amount: 30000, date: '2026-11-02', isProjected: true }
-    ], '2026-11-02');
-    expect(s).toEqual({ income: 30000, expense: 2000, fixed: 8000, savings: 5000, balance: 15000 });
+  it('counts this month pending salary/fixed and skips rows after month end', () => {
+    const s = summarizeWallet(
+      [
+        { type: 'income', amount: 30000, date: '2026-10-25' },
+        { type: 'expense', amount: 2000, date: '2026-10-26' },
+        { type: 'savings', amount: 5000, date: '2026-11-01' },
+        { type: 'expense', amount: 999, date: '2026-12-01' },
+        // projected ที่ติดมากับ transactions ไม่นับซ้ำ
+        { type: 'income', amount: 1, date: '2026-11-25', isProjected: true }
+      ],
+      [
+        { type: 'income', amount: 30000, date: '2026-11-25', isProjected: true },
+        { type: 'fixed', amount: 8000, date: '2026-11-05', isProjected: true }
+      ],
+      '2026-11-30'
+    );
+    expect(s).toEqual({
+      income: 60000, expense: 2000, fixed: 8000, savings: 5000, pendingIncome: 30000, balance: 45000
+    });
   });
 });
 
