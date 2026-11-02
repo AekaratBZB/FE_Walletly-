@@ -8,6 +8,7 @@ import { recurringEntriesApi } from '../../shared/api';
 import { mergeWithProjected, periodToRange } from './transactionMapping';
 import { useProjectedEntries } from './useProjectedEntries';
 import { ProjectedEntryModal } from './ProjectedEntryModal';
+import { WalletOverview } from './WalletOverview';
 
 // 'month' = รายเดือน (ค่าเริ่มต้น: เดือนปัจจุบัน), 'range' = ช่วงวันที่, 'all' = ทั้งหมด
 const matchPeriod = (date, { periodMode, month, startDate, endDate }) => {
@@ -24,6 +25,7 @@ export const TransactionsTab = () => {
     reloadTransactions,
     addToast,
     setIsAddTxOpen,
+    setEditingTx,
     exportTransactionsCSV
   } = useWallet();
 
@@ -169,6 +171,8 @@ export const TransactionsTab = () => {
           </button>
         </div>
       </div>
+
+      <WalletOverview transactions={transactions} />
 
       {/* Filter and Search Bar Card */}
       <div className="card mb-4" style={{ padding: '1rem 1.25rem' }}>
@@ -394,15 +398,13 @@ export const TransactionsTab = () => {
                         {sign}{formatCurrency(t.amount)}
                       </td>
                       <td className="text-right">
-                        {t.isProjected && (
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => setEditingProjected(t)}
-                            title="แก้ไขยอดเดือนนี้"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                        )}
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => (t.isProjected ? setEditingProjected(t) : setEditingTx(t))}
+                          title={t.isProjected ? 'แก้ไขยอดเดือนนี้' : 'แก้ไขรายการ'}
+                        >
+                          <Pencil size={16} />
+                        </button>
                         <button
                           className="btn btn-ghost btn-sm"
                           onClick={() => handleDelete(t)}

@@ -6,13 +6,52 @@ export const mapTransactionDto = (dto) => ({
   categoryId: dto.categoryId,
   amount: Number(dto.amount) || 0,
   paymentMethod: dto.paymentMethodName || '',
+  paymentMethodId: dto.paymentMethodId ?? null,
   note: dto.note || '',
   isProjected: dto.isProjected === true,
   sourceType: dto.sourceType ?? null,
   sourceId: dto.sourceId ?? null,
   sourcePeriod: dto.sourcePeriod ?? null,
-  isUserModified: dto.isUserModified === true
+  isUserModified: dto.isUserModified === true,
+  // ลิงก์ที่ PUT ต้องส่งกลับไปเหมือนเดิม ไม่งั้น BE จะล้างทิ้ง (เช่น เป้าออม/หนี้ที่ผูกไว้)
+  accountId: dto.accountId ?? null,
+  destinationAccountId: dto.destinationAccountId ?? null,
+  savingsGoalId: dto.savingsGoalId ?? null,
+  fixedCostId: dto.fixedCostId ?? null,
+  debtId: dto.debtId ?? null,
+  isRecurring: dto.isRecurring === true
 });
+
+// รายการที่ผูกกับเป้าออม/หนี้/ฟิกคอส/รายรับประจำ: ห้ามเปลี่ยนประเภท เพราะยอดฝั่งนั้นอิงประเภทเดิม
+export const isLinkedTransaction = (tx) =>
+  !!(tx?.sourceType || tx?.savingsGoalId || tx?.debtId || tx?.fixedCostId);
+
+// body ของ PUT /transactions/{id}: คงลิงก์เดิมไว้ทั้งหมด
+// เปลี่ยนช่องทางชำระแล้วส่ง accountId = null ให้ BE ผูกบัญชีตามช่องทางใหม่เอง
+export const buildUpdatePayload = (original, changes, { categoryId, paymentMethodId }) => ({
+  type: changes.type,
+  amount: Number(changes.amount) || 0,
+  txDate: changes.date,
+  categoryId,
+  accountId: paymentMethodId === original.paymentMethodId ? original.accountId ?? null : null,
+  destinationAccountId: original.destinationAccountId ?? null,
+  paymentMethodId: paymentMethodId ?? null,
+  savingsGoalId: original.savingsGoalId ?? null,
+  fixedCostId: original.fixedCostId ?? null,
+  debtId: original.debtId ?? null,
+  note: changes.note || '',
+  isRecurring: original.isRecurring === true
+});
+
+// ยอดเงินรวมจากรายการจริงถึงวันนี้ (ไม่นับรายการคาดการณ์): รายรับ/เงินเดือน - รายจ่าย - ฟิกคอส - เงินออม
+export const summarizeWallet = (transactions = [], today) => {
+  const totals = { income: 0, expense: 0, fixed: 0, savings: 0 };
+  for (const t of transactions) {
+    if (t.isProjected || (today && t.date > today)) continue;
+    if (t.type in totals) totals[t.type] += Number(t.amount) || 0;
+  }
+  return { ...totals, balance: totals.income - totals.expense - totals.fixed - totals.savings };
+};
 
 const normalizeName = (name) => String(name || '').toLowerCase().replace(/\s+/g, '');
 

@@ -10,6 +10,7 @@ export * from './allocationsApi';
 export * from './taxesApi';
 export * from './categoriesApi';
 export * from './accountsApi';
+export * from './paymentMethodsApi';
 export * from './consentsApi';
 export * from './healthApi';
 export * from './summaryApi';

@@ -1,5 +1,57 @@
 import { describe, it, expect } from 'vitest';
-import { mapTransactionDto, periodToRange, mergeWithProjected, resolveCategoryId } from '../transactionMapping';
+import {
+  mapTransactionDto,
+  periodToRange,
+  mergeWithProjected,
+  resolveCategoryId,
+  buildUpdatePayload,
+  isLinkedTransaction,
+  summarizeWallet
+} from '../transactionMapping';
+
+describe('buildUpdatePayload', () => {
+  const original = {
+    id: 'a-1', paymentMethod: 'เงินสด', paymentMethodId: 'pm-cash', accountId: 'acc-cash',
+    destinationAccountId: null, savingsGoalId: 'goal-1', fixedCostId: null, debtId: 'debt-1', isRecurring: true
+  };
+  const changes = { type: 'savings', amount: '1500', date: '2026-11-01', note: 'n' };
+
+  it('keeps links and account when payment method unchanged', () => {
+    expect(buildUpdatePayload(original, changes, { categoryId: 'c1', paymentMethodId: 'pm-cash' })).toEqual({
+      type: 'savings', amount: 1500, txDate: '2026-11-01', categoryId: 'c1',
+      accountId: 'acc-cash', destinationAccountId: null, paymentMethodId: 'pm-cash',
+      savingsGoalId: 'goal-1', fixedCostId: null, debtId: 'debt-1', note: 'n', isRecurring: true
+    });
+  });
+
+  it('drops account so BE re-derives it when payment method changes', () => {
+    const p = buildUpdatePayload(original, changes, { categoryId: 'c1', paymentMethodId: 'pm-qr' });
+    expect(p.accountId).toBeNull();
+    expect(p.paymentMethodId).toBe('pm-qr');
+  });
+});
+
+describe('isLinkedTransaction', () => {
+  it('detects goal/debt/source links', () => {
+    expect(isLinkedTransaction({ savingsGoalId: 'g' })).toBe(true);
+    expect(isLinkedTransaction({ sourceType: 'fixedCost' })).toBe(true);
+    expect(isLinkedTransaction({ id: 'x' })).toBe(false);
+  });
+});
+
+describe('summarizeWallet', () => {
+  it('sums actual rows up to today and skips projected/future', () => {
+    const s = summarizeWallet([
+      { type: 'income', amount: 30000, date: '2026-10-25' },
+      { type: 'expense', amount: 2000, date: '2026-10-26' },
+      { type: 'fixed', amount: 8000, date: '2026-11-01' },
+      { type: 'savings', amount: 5000, date: '2026-11-01' },
+      { type: 'expense', amount: 999, date: '2026-11-30' },
+      { type: 'income', amount: 30000, date: '2026-11-02', isProjected: true }
+    ], '2026-11-02');
+    expect(s).toEqual({ income: 30000, expense: 2000, fixed: 8000, savings: 5000, balance: 15000 });
+  });
+});
 
 describe('mapTransactionDto', () => {
   it('maps a plain dto with defaults', () => {
@@ -12,12 +64,19 @@ describe('mapTransactionDto', () => {
       categoryId: undefined,
       amount: 10,
       paymentMethod: '',
+      paymentMethodId: null,
       note: '',
       isProjected: false,
       sourceType: null,
       sourceId: null,
       sourcePeriod: null,
-      isUserModified: false
+      isUserModified: false,
+      accountId: null,
+      destinationAccountId: null,
+      savingsGoalId: null,
+      fixedCostId: null,
+      debtId: null,
+      isRecurring: false
     });
   });
 

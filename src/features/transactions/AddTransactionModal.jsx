@@ -4,9 +4,22 @@ import { Modal } from '../../components/Modal';
 import { ThaiDatePicker } from '../../components/ThaiDatePicker';
 import { TRANSACTION_CATEGORIES, PAYMENT_METHODS } from '../../shared/constants';
 import { getTodayDateString } from '../../shared/formatters';
+import { isLinkedTransaction } from './transactionMapping';
 
 export const AddTransactionModal = () => {
-  const { isAddTxOpen, setIsAddTxOpen, addTransaction, categories: allCategories = [] } = useWallet();
+  const {
+    isAddTxOpen,
+    setIsAddTxOpen,
+    editingTx,
+    setEditingTx,
+    addTransaction,
+    updateTransaction,
+    categories: allCategories = []
+  } = useWallet();
+  const isEditing = !!editingTx;
+  const isOpen = isAddTxOpen || isEditing;
+  const typeLocked = isEditing && isLinkedTransaction(editingTx);
+  const [isSaving, setIsSaving] = useState(false);
 
   // ล็อกอินแล้วใช้หมวดหมู่จริงจาก BE เพื่อให้ได้ categoryId ที่ถูกต้อง (ชื่อในเครื่องไม่ตรงกับ BE ทุกตัว)
   const getCategoryOptions = (t) => {
@@ -21,13 +34,35 @@ export const AddTransactionModal = () => {
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
   const [note, setNote] = useState('');
 
-  // Update category when type changes
+  // เปิดแก้ไข: เติมค่าจากรายการเดิม
   useEffect(() => {
-    setCategory(getCategoryOptions(type)[0] || '');
+    if (!editingTx) return;
+    setType(editingTx.type);
+    setAmount(String(editingTx.amount ?? ''));
+    setCategory(editingTx.category || '');
+    setDate(editingTx.date || getTodayDateString());
+    setPaymentMethod(editingTx.paymentMethod || PAYMENT_METHODS[0]);
+    setNote(editingTx.note || '');
+  }, [editingTx]);
+
+  // Update category when type changes (ตอนแก้ไขคงหมวดเดิมไว้ถ้ายังอยู่ในประเภทนั้น)
+  useEffect(() => {
+    const options = getCategoryOptions(type);
+    setCategory(prev =>
+      editingTx && editingTx.type === type && prev === editingTx.category ? prev : options[0] || ''
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, allCategories]);
 
-  const handleSubmit = (e) => {
+  const close = () => {
+    setAmount('');
+    setNote('');
+    setDate(getTodayDateString());
+    setIsAddTxOpen(false);
+    setEditingTx(null);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount <= 0) {
@@ -36,7 +71,7 @@ export const AddTransactionModal = () => {
     }
 
     const beCategory = allCategories.find(c => c.type === type && c.name === category);
-    addTransaction({
+    const tx = {
       type,
       amount: numAmount,
       category,
@@ -44,22 +79,31 @@ export const AddTransactionModal = () => {
       date: date || getTodayDateString(),
       paymentMethod,
       note: note.trim()
-    });
+    };
 
-    // Reset & Close
-    setAmount('');
-    setNote('');
-    setDate(getTodayDateString());
-    setIsAddTxOpen(false);
+    if (isEditing) {
+      setIsSaving(true);
+      const ok = await updateTransaction(editingTx, tx);
+      setIsSaving(false);
+      if (ok) close();
+      return;
+    }
+
+    addTransaction(tx);
+    close();
   };
 
   const categories = getCategoryOptions(type);
+  // รายการเก่าอาจมีหมวด/ช่องทางที่ไม่อยู่ในตัวเลือกแล้ว: ใส่ไว้ให้เห็นค่าเดิม
+  const categoryOptions = category && !categories.includes(category) ? [category, ...categories] : categories;
+  const paymentOptions =
+    paymentMethod && !PAYMENT_METHODS.includes(paymentMethod) ? [paymentMethod, ...PAYMENT_METHODS] : PAYMENT_METHODS;
 
   return (
     <Modal
-      isOpen={isAddTxOpen}
-      onClose={() => setIsAddTxOpen(false)}
-      title="📝 บันทึกรายการใหม่"
+      isOpen={isOpen}
+      onClose={close}
+      title={isEditing ? '✏️ แก้ไขรายการ' : '📝 บันทึกรายการใหม่'}
     >
       <form onSubmit={handleSubmit}>
         {/* Transaction Type Radio Selector */}
@@ -79,7 +123,8 @@ export const AddTransactionModal = () => {
                   background: type === item.id ? 'var(--bg-subtle)' : 'transparent',
                   border: `1px solid ${type === item.id ? 'var(--primary)' : 'var(--border-color)'}`,
                   borderRadius: 'var(--radius-md)',
-                  cursor: 'pointer',
+                  cursor: typeLocked ? 'not-allowed' : 'pointer',
+                  opacity: typeLocked && type !== item.id ? 0.5 : 1,
                   fontSize: '0.85rem',
                   fontWeight: type === item.id ? '600' : '400'
                 }}
@@ -89,6 +134,7 @@ export const AddTransactionModal = () => {
                   name="tx-type-radio"
                   value={item.id}
                   checked={type === item.id}
+                  disabled={typeLocked}
                   onChange={(e) => setType(e.target.value)}
                   style={{ accentColor: 'var(--primary)' }}
                 />
@@ -96,6 +142,11 @@ export const AddTransactionModal = () => {
               </label>
             ))}
           </div>
+          {typeLocked && (
+            <div className="text-xs text-muted" style={{ marginTop: 4 }}>
+              รายการนี้ผูกกับเป้าออม/หนี้/รายการประจำ จึงเปลี่ยนประเภทไม่ได้
+            </div>
+          )}
         </div>
 
         {/* Amount */}
@@ -122,7 +173,7 @@ export const AddTransactionModal = () => {
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
-              {categories.map(c => (
+              {categoryOptions.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
@@ -142,7 +193,7 @@ export const AddTransactionModal = () => {
             value={paymentMethod}
             onChange={(e) => setPaymentMethod(e.target.value)}
           >
-            {PAYMENT_METHODS.map(m => (
+            {paymentOptions.map(m => (
               <option key={m} value={m}>{m}</option>
             ))}
           </select>
@@ -164,12 +215,12 @@ export const AddTransactionModal = () => {
           <button
             type="button"
             className="btn btn-outline"
-            onClick={() => setIsAddTxOpen(false)}
+            onClick={close}
           >
             ยกเลิก
           </button>
-          <button type="submit" className="btn btn-primary">
-            บันทึกรายการ
+          <button type="submit" className="btn btn-primary" disabled={isSaving}>
+            {isEditing ? 'บันทึกการแก้ไข' : 'บันทึกรายการ'}
           </button>
         </div>
       </form>
