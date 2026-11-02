@@ -31,6 +31,7 @@ Create `src/features/debt/AddDebtModal.jsx`:
 ```jsx
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../../components/Modal';
+import { ThaiDatePicker } from '../../components/ThaiDatePicker';
 import { useWallet } from '../../context/WalletContext';
 
 const EMPTY = {
@@ -385,11 +386,12 @@ export const AddDebtModal = () => {
 
                 <div className="form-group">
                   <label className="form-label">วันที่ในใบเสนอ</label>
-                  <input
-                    type="date"
-                    className="form-input"
+                  <ThaiDatePicker
                     value={form.settlementQuoteDate || ''}
-                    onChange={(e) => set({ settlementQuoteDate: e.target.value || null })}
+                    onChange={(v) => set({ settlementQuoteDate: v || null })}
+                    ariaLabel="วันที่ในใบเสนอ"
+                    placeholder="ไม่ระบุ"
+                    allowClear
                   />
                 </div>
               </>

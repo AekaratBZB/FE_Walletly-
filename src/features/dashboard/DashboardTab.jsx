@@ -39,6 +39,13 @@ export const DashboardTab = () => {
   const currentMonthPrefix = getCurrentMonthPrefix();
   // ตัวเลขสรุปทั้งหมดมาจาก BE (แหล่งเดียว) ฝั่ง FE ใช้รายการฟิกคอสแค่แสดงช่องติ๊ก
   const { summary, error, isLoading, reload } = useMonthlySummary(currentMonthPrefix, !isGuest);
+  const projectedIncome = summary?.projectedIncome ?? 0;
+  const projectedFixedCosts = summary?.projectedFixedCosts ?? 0;
+  // นับเงินเดือน/ฟิกคอสของเดือนนี้ที่ยังไม่ถึงวันเข้าในยอดด้วย (BE คิด projectedBalance ไว้ให้แล้ว)
+  const monthIncome = summary && summary.totalIncome + projectedIncome;
+  const monthFixedTotal = summary && summary.totalFixedCosts + projectedFixedCosts;
+  const monthSpent = summary && summary.totalSpent + projectedFixedCosts;
+  const monthBalance = summary && (summary.projectedBalance ?? summary.netRemaining);
   const showValue = (value) => (summary ? formatCurrency(value) : isLoading ? 'กำลังโหลด…' : '-');
 
   // ช่องติ๊กของรายการฟิกคอสที่อยู่ในระยะเวลาเดือนนี้ (ติ๊ก = นับเป็นรายจ่าย)
@@ -107,8 +114,15 @@ export const DashboardTab = () => {
           <div className="grid grid-cols-4">
             <StatCard
               label="รายรับรวมเดือนนี้"
-              value={showValue(summary?.totalIncome)}
-              subtext="เงินเดือน + รายได้เสริม"
+              value={showValue(monthIncome)}
+              subtext={
+                <>
+                  <div>เงินเดือน + รายได้เสริม</div>
+                  {projectedIncome > 0 && (
+                    <div className="text-xs text-muted">รวมรอเข้า {formatCurrency(projectedIncome)}</div>
+                  )}
+                </>
+              }
               icon={Wallet}
               colorScheme="emerald"
               valueClass="text-success"
@@ -116,7 +130,7 @@ export const DashboardTab = () => {
 
             <StatCard
               label="รายจ่ายรวมทั้งหมด"
-              value={showValue(summary?.totalSpent)}
+              value={showValue(monthSpent)}
               subtext="ฟิกคอส + กินใช้ผันแปร"
               icon={CreditCard}
               colorScheme="rose"
@@ -125,23 +139,39 @@ export const DashboardTab = () => {
 
             <StatCard
               label="ยอดเงินคงเหลือสุทธิ"
-              value={showValue(summary?.netRemaining)}
-              subtext="รายรับ หัก รายจ่ายและเงินออม"
+              value={showValue(monthBalance)}
+              subtext={
+                <>
+                  <div>รายรับ หัก รายจ่ายและเงินออม</div>
+                  {(projectedIncome > 0 || projectedFixedCosts > 0) && (
+                    <div className="text-xs text-muted">
+                      รวมรายการรอดำเนินการ (ตอนนี้จริง {formatCurrency(summary?.netRemaining ?? 0)})
+                    </div>
+                  )}
+                </>
+              }
               icon={Banknote}
               colorScheme="blue"
               variant="dark"
-              valueClass={(summary?.netRemaining ?? 0) >= 0 ? '' : 'text-danger'}
+              valueClass={(monthBalance ?? 0) >= 0 ? '' : 'text-danger'}
             />
 
             <StatCard
               label="ฟิกคอสประจำเดือน"
-              value={showValue(summary?.totalFixedCosts)}
+              value={showValue(monthFixedTotal)}
               subtext={
-                !summary
-                  ? ' '
-                  : summary.fixedCostsActiveCount === 0
-                    ? 'ยังไม่มีฟิกคอสเดือนนี้'
-                    : `นับในรายจ่าย ${summary.fixedCostsIncludedCount}/${summary.fixedCostsActiveCount} รายการ`
+                <>
+                  <div>
+                    {!summary
+                      ? ' '
+                      : summary.fixedCostsActiveCount === 0
+                        ? 'ยังไม่มีฟิกคอสเดือนนี้'
+                        : `นับในรายจ่าย ${summary.fixedCostsIncludedCount}/${summary.fixedCostsActiveCount} รายการ`}
+                  </div>
+                  {projectedFixedCosts > 0 && (
+                    <div className="text-xs text-muted">รวมรอตัด {formatCurrency(projectedFixedCosts)}</div>
+                  )}
+                </>
               }
               icon={CalendarClock}
               colorScheme="orange"

@@ -69,7 +69,13 @@ export const WalletProvider = ({ children }) => {
 
   // Modular Feature Slices
   const transactionsSlice = useTransactionsState({ addToast, categories, userId, onSynced });
-  const fixedCostsSlice = useFixedCostsState({ addToast, categories, userId, onSynced });
+  const fixedCostsSlice = useFixedCostsState({
+    addToast,
+    categories,
+    userId,
+    onSynced,
+    reloadTransactions: transactionsSlice.reloadTransactions
+  });
   const savingsSlice = useSavingsState({
     addToast,
     addTransaction: transactionsSlice.addTransaction,

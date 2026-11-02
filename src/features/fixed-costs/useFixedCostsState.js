@@ -7,7 +7,7 @@ import { toApiMonth, toMonthKey } from './fixedCostPeriod';
 // id ที่ BE สร้าง (GUID) ไม่ใช่ id ชั่วคราวฝั่ง FE ('fc-...')
 const isSyncedId = (id) => typeof id === 'string' && id.includes('-') && !id.startsWith('fc-');
 
-export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced } = {}) => {
+export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced, reloadTransactions } = {}) => {
   const token = getStoredToken();
   const [fixedCosts, setFixedCosts] = useState(() => (token ? [] : loadFixedCosts()));
   const [isAddFixedCostOpen, setIsAddFixedCostOpen] = useState(false);
@@ -103,7 +103,6 @@ export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced
             endMonth: toApiMonth(newCost.endMonth)
           });
 
-          onSynced?.();
           if (created?.id) {
             setFixedCosts(prev =>
               prev.map(fc =>
@@ -113,6 +112,9 @@ export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced
               )
             );
           }
+          // BE สร้างแถวอัตโนมัติของเดือนที่ถึงวันแล้ว จึงโหลดรายการใหม่ (เรียก onSynced ในตัว)
+          if (reloadTransactions) await reloadTransactions();
+          else onSynced?.();
         }
       } catch (err) {
         console.warn('Failed to sync new fixed cost to BE:', err);
@@ -154,9 +156,12 @@ export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced
           linkedDebtId: updated.linkedDebtId || null,
           note: updated.note || '',
           startMonth: toApiMonth(updated.startMonth),
-          endMonth: toApiMonth(updated.endMonth)
+          endMonth: toApiMonth(updated.endMonth),
+          effectiveFrom: toApiMonth(changes.effectiveFrom)
         });
-        onSynced?.();
+        // แก้ค่าตั้งแต่เดือนที่กำหนดทำให้ยอดรายการที่ BE สร้างให้เปลี่ยน จึงโหลดรายการใหม่ (เรียก onSynced ในตัว)
+        if (reloadTransactions) await reloadTransactions();
+        else onSynced?.();
         if (saved?.categoryName) {
           setFixedCosts(prev => prev.map(fc => (fc.id === id ? { ...fc, category: saved.categoryName } : fc)));
         }
@@ -232,7 +237,9 @@ export const useFixedCostsState = ({ addToast, categories = [], userId, onSynced
           fixedCostIds: syncedIds,
           included
         });
-        onSynced?.();
+        // ติ๊กออกทำให้ BE ลบแถวอัตโนมัติของเดือนนั้น จึงโหลดรายการใหม่ (เรียก onSynced ในตัว)
+        if (reloadTransactions) await reloadTransactions();
+        else onSynced?.();
       } catch (err) {
         console.warn('Failed to sync fixed cost inclusion to BE:', err);
         if (addToast) addToast('บันทึกการเลือกฟิกคอสไปยังเซิร์ฟเวอร์ไม่สำเร็จ', 'danger');

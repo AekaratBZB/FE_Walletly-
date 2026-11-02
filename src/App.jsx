@@ -14,6 +14,7 @@ import { CookieConsentBanner, CookiePreferencesModal, PrivacyPolicyModal } from 
 import { DashboardTab } from './features/dashboard';
 import { TransactionsTab, AddTransactionModal } from './features/transactions';
 import { FixedCostsTab, AddFixedCostModal } from './features/fixed-costs';
+import { RecurringIncomesTab } from './features/recurring-income';
 import { ProjectionTab } from './features/projection';
 import { DebtTab, AddDebtModal } from './features/debt';
 import { AllocationTab } from './features/allocation';
@@ -42,6 +43,8 @@ export const App = () => {
         return <TransactionsTab />;
       case 'fixed-costs':
         return <FixedCostsTab />;
+      case 'recurring-income':
+        return <RecurringIncomesTab />;
       case 'projection':
         return <ProjectionTab />;
       case 'debt':

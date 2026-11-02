@@ -10,7 +10,8 @@ import {
   FileSpreadsheet,
   BarChart3,
   Plus,
-  Landmark
+  Landmark,
+  Wallet
 } from 'lucide-react';
 import { UserMenu } from './UserMenu';
 
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'dashboard', label: 'ภาพรวม', fullLabel: 'ภาพรวมการเงิน', icon: LayoutDashboard },
   { id: 'transactions', label: 'รายรับ-จ่าย', fullLabel: 'บันทึกรายรับ-รายจ่าย', icon: ReceiptText },
   { id: 'fixed-costs', label: 'ฟิกคอส', fullLabel: 'ฟิกคอสรายเดือน', icon: CalendarCheck },
+  { id: 'recurring-income', label: 'รายรับประจำ', fullLabel: 'รายรับประจำรายเดือน', icon: Wallet },
   { id: 'projection', label: 'คาดการณ์เงิน', fullLabel: 'คาดการณ์กระแสเงินล่วงหน้า', icon: TrendingUp },
   { id: 'debt', label: 'ปลอดหนี้', fullLabel: 'วางแผนปลอดหนี้ (Debt Payoff Planner)', icon: Landmark },
   { id: 'allocation', label: 'แบ่งสัดส่วน', fullLabel: 'แบ่งสัดส่วนการเงิน 50/30/20', icon: PieChart },
