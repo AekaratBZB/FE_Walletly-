@@ -41,7 +41,11 @@ export const DashboardTab = () => {
   const { summary, error, isLoading, reload } = useMonthlySummary(currentMonthPrefix, !isGuest);
   const projectedIncome = summary?.projectedIncome ?? 0;
   const projectedFixedCosts = summary?.projectedFixedCosts ?? 0;
-  const hasProjected = projectedIncome > 0 || projectedFixedCosts > 0;
+  // นับเงินเดือน/ฟิกคอสของเดือนนี้ที่ยังไม่ถึงวันเข้าในยอดด้วย (BE คิด projectedBalance ไว้ให้แล้ว)
+  const monthIncome = summary && summary.totalIncome + projectedIncome;
+  const monthFixedTotal = summary && summary.totalFixedCosts + projectedFixedCosts;
+  const monthSpent = summary && summary.totalSpent + projectedFixedCosts;
+  const monthBalance = summary && (summary.projectedBalance ?? summary.netRemaining);
   const showValue = (value) => (summary ? formatCurrency(value) : isLoading ? 'กำลังโหลด…' : '-');
 
   // ช่องติ๊กของรายการฟิกคอสที่อยู่ในระยะเวลาเดือนนี้ (ติ๊ก = นับเป็นรายจ่าย)
@@ -110,12 +114,12 @@ export const DashboardTab = () => {
           <div className="grid grid-cols-4">
             <StatCard
               label="รายรับรวมเดือนนี้"
-              value={showValue(summary?.totalIncome)}
+              value={showValue(monthIncome)}
               subtext={
                 <>
                   <div>เงินเดือน + รายได้เสริม</div>
                   {projectedIncome > 0 && (
-                    <div className="text-xs text-muted">+ รอเข้า {formatCurrency(projectedIncome)}</div>
+                    <div className="text-xs text-muted">รวมรอเข้า {formatCurrency(projectedIncome)}</div>
                   )}
                 </>
               }
@@ -126,7 +130,7 @@ export const DashboardTab = () => {
 
             <StatCard
               label="รายจ่ายรวมทั้งหมด"
-              value={showValue(summary?.totalSpent)}
+              value={showValue(monthSpent)}
               subtext="ฟิกคอส + กินใช้ผันแปร"
               icon={CreditCard}
               colorScheme="rose"
@@ -135,13 +139,13 @@ export const DashboardTab = () => {
 
             <StatCard
               label="ยอดเงินคงเหลือสุทธิ"
-              value={showValue(summary?.netRemaining)}
+              value={showValue(monthBalance)}
               subtext={
                 <>
                   <div>รายรับ หัก รายจ่ายและเงินออม</div>
-                  {hasProjected && (
+                  {(projectedIncome > 0 || projectedFixedCosts > 0) && (
                     <div className="text-xs text-muted">
-                      คาดการณ์สิ้นเดือน {formatCurrency(summary?.projectedBalance ?? 0)}
+                      รวมรายการรอดำเนินการ (ตอนนี้จริง {formatCurrency(summary?.netRemaining ?? 0)})
                     </div>
                   )}
                 </>
@@ -149,12 +153,12 @@ export const DashboardTab = () => {
               icon={Banknote}
               colorScheme="blue"
               variant="dark"
-              valueClass={(summary?.netRemaining ?? 0) >= 0 ? '' : 'text-danger'}
+              valueClass={(monthBalance ?? 0) >= 0 ? '' : 'text-danger'}
             />
 
             <StatCard
               label="ฟิกคอสประจำเดือน"
-              value={showValue(summary?.totalFixedCosts)}
+              value={showValue(monthFixedTotal)}
               subtext={
                 <>
                   <div>
@@ -165,7 +169,7 @@ export const DashboardTab = () => {
                         : `นับในรายจ่าย ${summary.fixedCostsIncludedCount}/${summary.fixedCostsActiveCount} รายการ`}
                   </div>
                   {projectedFixedCosts > 0 && (
-                    <div className="text-xs text-muted">+ รอตัด {formatCurrency(projectedFixedCosts)}</div>
+                    <div className="text-xs text-muted">รวมรอตัด {formatCurrency(projectedFixedCosts)}</div>
                   )}
                 </>
               }
